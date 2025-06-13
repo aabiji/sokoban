@@ -115,16 +115,36 @@ Asset loadAsset(const char* path, Vector3 targetSize) {
     return asset;
 }
 
-typedef struct
-{
+typedef struct {
     Texture texture;
     Asset assets[PieceEnumSize];
     Vector3 tileSize;
+
+    Vector2 player;
 
     Board* boards;
     int numBoards;
     int level;
 } Game;
+
+void changeLevel(Game* game, bool next) {
+    game->level = next ? game->level + 1 : game->level - 1;
+    game->level = Clamp(game->level, 0, game->numBoards);
+
+    // find the player
+    Board board = game->boards[game->level];
+    for (int y = 0; y < board.size.y; y++) {
+	for (int x = 0; x < board.size.x; x++) {
+	    int index = y * board.size.x + x;
+	    if (board.pieces[index] == Pusher) {
+		board.pieces[index] = Floor;
+		game->player.x = x;
+		game->player.y = y;
+		break;
+	    }
+	}
+    }
+}
 
 Game newGame() {
     Game game;
@@ -142,9 +162,12 @@ Game newGame() {
 	m.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = game.texture;
     }
 
-    game.level = 0;
     game.numBoards = 35;
     game.boards = loadBoards("../src/levels.txt", game.numBoards);
+
+    game.level = -1;
+    changeLevel(&game, true);
+
     return game;
 }
 
@@ -155,6 +178,28 @@ void cleanupGame(Game* game) {
     UnloadTexture(game->texture);
 
     cleanupBoards(game->boards, game->numBoards);
+}
+
+typedef struct {
+    bool corner;
+    float rotation;
+} Border;
+
+Border computeBorder(Board board, int x, int y) {
+    int w = board.size.x, h = board.size.y;
+    bool l = x - 1 < 0  || board.pieces[y * w + (x - 1)] != Wall; // left empty?
+    bool r = x + 1 >= w || board.pieces[y * w + (x + 1)] != Wall; // right empty?
+    bool t = y - 1 < 0  || board.pieces[(y - 1) * w + x] != Wall; // top empty?
+    bool b = y + 1 >= h || board.pieces[(y + 1) * w + x] != Wall; // bottom empty?
+ 
+    if (!l && r && t && !b) return (Border){ true, 0 };   // top right corner
+    if (!l && r && b && !t) return (Border){ true, 270 }; // bottom right corner
+    if (l && !r && b && !t) return (Border){ true, 180 }; // bottom left corner
+    if (l && !r && t && !b) return (Border){ true, 90 };  // top left corner
+    if ((l && r && t && !b) || (l && r && !t && b) || (l && r && !t && !b))
+	return (Border){ false, 90 }; // vertical side 
+
+    return (Border){ false, 0 }; // horizontal side
 }
 
 void drawLevel(Game* game) {
@@ -168,35 +213,25 @@ void drawLevel(Game* game) {
 
     for (int i = 0; i < board.size.y; i++) {
 	for (int j = 0; j < board.size.x; j++) {
-	    int w = board.size.x, h = board.size.y;
-	    // check if sides are empty
-	    // TODO: fix this
-	    bool left   = j - 1 < 0  || board.pieces[i * h + (j - 1)] == Floor;
-	    bool right  = j + 1 >= w || board.pieces[i * h + (j + 1)] == Floor;
-	    bool top    = i - 1 < 0  || board.pieces[(i - 1) * h + j] == Floor;
-	    bool bottom = i + 1 >= h || board.pieces[(i + 1) * h + j] == Floor;
-	    bool edge = (top && left && bottom) || (top && right && bottom) || (bottom && left && top) || (bottom && right && top);
-
-	    Piece current = board.pieces[i * (int)board.size.x + j];
-	    Piece p = current == Wall && edge ? Corner : current;
+	    float angle = 0;
+	    Vector3 axis = {0, 1, 0};
+	    Piece p = board.pieces[i * (int)board.size.x + j];
 	    Asset a = game->assets[p];
 
-	    Vector3 axis = { 0, 0, 0 };
-	    float angle = 0;
+	    bool player = j == game->player.x && i == game->player.y;
+	    if (player) a = game->assets[Pusher];
 
-	    // side wall -- rotate so it's vertical
-	    if (p == Wall && (left || right)) {
-		angle = 90;
-		axis.y = 1;
+	    // Figure out how to draw the wall
+	    if (p == Wall) {
+		Border b = computeBorder(board, j, i);
+		if (b.corner) a = game->assets[Corner];
+		angle = b.rotation;
 	    }
 
-	    // Rotate corners properly
-	    if (p == Corner) {
-		axis.y = 1;
-		if (top && right) angle = 0;
-		else if (top && left) angle = 90;
-		else if (bottom && left) angle = 180;
-		else if (bottom && right) angle = 270;
+	    // Draw a floor underneath
+	    if ((p != Floor && p != Goal) || player) {
+		Asset tile = player ? a : game->assets[Floor];
+		DrawModelEx(tile.model, pos, axis, 0, tile.scaleFactor, WHITE);
 	    }
 
 	    DrawModelEx(a.model, pos, axis, angle, a.scaleFactor, WHITE);
@@ -206,6 +241,20 @@ void drawLevel(Game* game) {
 	pos.x = start.x;
 	pos.z += game->tileSize.z;
     }
+}
+
+void movePlayer(Game* game, int deltaX, int deltaY) {
+    Board b = game->boards[game->level];
+    Vector2 next = {
+	fmax(0, fmin(game->player.x + deltaX, b.size.x)),
+	fmax(0, fmin(game->player.y + deltaY, b.size.y))
+    };
+
+    int index = next.y * b.size.x + next.x;
+    if (b.pieces[index] == Wall) return;
+    game->player = next;
+
+    // TODO: move boxes along -- kind of like that advent of code problem
 }
 
 int main() {
@@ -223,8 +272,18 @@ int main() {
     camera.projection = CAMERA_PERSPECTIVE;
 
     while (!WindowShouldClose()) {
+	if (IsKeyPressed(KEY_L)) changeLevel(&game, true);
+	if (IsKeyPressed(KEY_J)) changeLevel(&game, false);
+	if (IsKeyPressed(KEY_RIGHT)) movePlayer(&game, 1, 0);
+	if (IsKeyPressed(KEY_LEFT)) movePlayer(&game, -1, 0);
+	if (IsKeyPressed(KEY_UP)) movePlayer(&game, 0, -1);
+	if (IsKeyPressed(KEY_DOWN)) movePlayer(&game, 0, 1);
+
+	camera.position.y += GetMouseWheelMove();
+
 	BeginDrawing();
 	ClearBackground(RAYWHITE);
+	DrawText(TextFormat("%d", game.level), 20, 10, 20, BLACK);
 
 	BeginMode3D(camera);
 	drawLevel(&game);
