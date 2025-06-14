@@ -7,8 +7,8 @@
 #include "raymath.h"
 
 typedef enum {
-    Floor, Pusher, Box, Goal,
-    Wall, SplitWall, Corner,
+    Floor, Pusher, Box, BoxOnGoal,
+    Goal, Wall, SplitWall, Corner,
     PieceEnumSize
 } Piece;
 
@@ -79,7 +79,8 @@ Level* loadLevels(const char* textFile, int amount) {
 	    if (*current == '#') p = Wall;
 	    if (*current == '@') p = Pusher;
 	    if (*current == '$') p = Box;
-	    if (*current == '*') p = Goal;
+	    if (*current == '.') p = Goal;
+	    if (*current == '*') p = BoxOnGoal;
 	    levels[i].tiles[index] = p;
 	}
     }
@@ -123,7 +124,7 @@ typedef struct {
     Vector2 player;
 
     Level* levels;
-    int goalPositions[14];
+    int goalPositions[20];
     int numLevels;
     int level;
     bool levelSolved;
@@ -139,20 +140,21 @@ void changeLevel(Game* game, bool next) {
     memset(game->goalPositions, -1, sizeof(game->goalPositions));
 
     // Find the player and store each goal position
-
     for (int y = 0; y < level.size.y; y++) {
 	for (int x = 0; x < level.size.x; x++) {
 	    int index = y * level.size.x + x;
+	    Piece t = level.original[index];
+
 	    // find the player
-	    if (level.original[index] == Pusher) {
+	    if (t == Pusher) {
 		level.tiles[index] = Floor;
 		game->player.x = x;
 		game->player.y = y;
 	    }
 
-	    if (level.original[index] == Goal) {
+	    if (t == BoxOnGoal || t == Goal) {
 		if (i >= len) {
-		    printf("no more space!\n");
+		    printf("Too many goals!\n");
 		    break;
 		}
 		game->goalPositions[i++] = index;	
@@ -180,7 +182,7 @@ Game newGame() {
     }
 
     // Load each level and keep an original copy of them
-    game.numLevels = 27;
+    game.numLevels = 55;
     game.levels = loadLevels("../src/levels.txt", game.numLevels);
     for (int i = 0; i < game.numLevels; i++) {
 	memcpy(game.levels[i].original, game.levels[i].tiles, game.levels[i].numBytes);
