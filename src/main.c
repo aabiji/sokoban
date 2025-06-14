@@ -7,8 +7,9 @@
 #include "raymath.h"
 
 typedef enum {
-    Floor, Wall, Pusher, Box,
-    Goal, Corner, PieceEnumSize
+    Floor, Pusher, Box, Goal,
+    Wall, SplitWall, Corner,
+    PieceEnumSize
 } Piece;
 
 Piece getPiece(char c) {
@@ -152,6 +153,7 @@ Game newGame() {
     game.tileSize = (Vector3){ 2, 2, 2 }; 
     game.assets[Box] = loadAsset("../assets/box_small.gltf", game.tileSize);
     game.assets[Wall] = loadAsset("../assets/wall.gltf", game.tileSize);
+    game.assets[SplitWall] = loadAsset("../assets/wall_Tsplit.gltf", game.tileSize);
     game.assets[Corner] = loadAsset("../assets/wall_corner.gltf", game.tileSize);
     game.assets[Floor] = loadAsset("../assets/floor_wood_small.gltf", game.tileSize);
     game.assets[Goal] = loadAsset("../assets/floor_dirt_small_A.gltf", game.tileSize);
@@ -162,7 +164,7 @@ Game newGame() {
 	m.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = game.texture;
     }
 
-    game.numBoards = 35;
+    game.numBoards = 27;
     game.boards = loadBoards("../src/levels.txt", game.numBoards);
 
     game.level = -1;
@@ -181,7 +183,8 @@ void cleanupGame(Game* game) {
 }
 
 typedef struct {
-    bool corner;
+    bool splitWall; // something like this: |-
+    bool corner; // something like this: ⌜
     float rotation;
 } Border;
 
@@ -191,15 +194,33 @@ Border computeBorder(Board board, int x, int y) {
     bool r = x + 1 >= w || board.pieces[y * w + (x + 1)] != Wall; // right empty?
     bool t = y - 1 < 0  || board.pieces[(y - 1) * w + x] != Wall; // top empty?
     bool b = y + 1 >= h || board.pieces[(y + 1) * w + x] != Wall; // bottom empty?
- 
-    if (!l && r && t && !b) return (Border){ true, 0 };   // top right corner
-    if (!l && r && b && !t) return (Border){ true, 270 }; // bottom right corner
-    if (l && !r && b && !t) return (Border){ true, 180 }; // bottom left corner
-    if (l && !r && t && !b) return (Border){ true, 90 };  // top left corner
-    if ((l && r && t && !b) || (l && r && !t && b) || (l && r && !t && !b))
-	return (Border){ false, 90 }; // vertical side 
 
-    return (Border){ false, 0 }; // horizontal side
+    // corners
+    if (!l && r && t && !b) return (Border){ false, true, 0 };   // top right
+    if (!l && r && b && !t) return (Border){ false, true, 270 }; // bottom right
+    if (l && !r && b && !t) return (Border){ false, true, 180 }; // bottom left
+    if (l && !r && t && !b) return (Border){ false, true, 90 };  // top left
+
+    // split wall
+    if (!l && !r && !t && b) return (Border){ true, false, 180 }; // upwards
+    if (!l && !r && t && !b) return (Border){ true, false, 0 }; // downwards
+    if (l && !r && !t && !b) return (Border){ true, false, 90 }; // right facing
+    if (!l && r && !t && !b) return (Border){ true, false, 270  }; // left facing
+
+    // vertical / horizontal side
+    return l && r ? (Border){ false, false, 90 } : (Border){ false, false, 0 };
+}
+
+void getFirstAndLastWalls(Board b, int row, int* indexFirst, int* indexLast) {
+    *indexFirst = b.size.x;
+    *indexLast = 0;
+    for (int i = 0; i < b.size.x; i++) {
+	int index = row * b.size.x + i;
+	if (b.pieces[index] == Wall) {
+	    if (i < *indexFirst) *indexFirst = i;
+	    if (i > *indexLast) *indexLast = i;
+	}
+    }
 }
 
 void drawLevel(Game* game) {
@@ -212,6 +233,9 @@ void drawLevel(Game* game) {
     Vector3 pos = { start.x, 0, start.y };
 
     for (int i = 0; i < board.size.y; i++) {
+	int first, last;
+	getFirstAndLastWalls(board, i, &first, &last);
+
 	for (int j = 0; j < board.size.x; j++) {
 	    float angle = 0;
 	    Vector3 axis = {0, 1, 0};
@@ -225,22 +249,38 @@ void drawLevel(Game* game) {
 	    if (p == Wall) {
 		Border b = computeBorder(board, j, i);
 		if (b.corner) a = game->assets[Corner];
+		if (b.splitWall) a = game->assets[SplitWall];
 		angle = b.rotation;
 	    }
 
-	    // Draw a floor underneath
-	    if ((p != Floor && p != Goal) || player) {
-		Asset tile = player ? a : game->assets[Floor];
-		DrawModelEx(tile.model, pos, axis, 0, tile.scaleFactor, WHITE);
+	    if (j >= first && j <= last) { // Don't draw outside of the bordering walls
+		// Draw a floor underneath
+		if ((p != Floor && p != Goal) || player) {
+		    Asset tile = player ? a : game->assets[Floor];
+		    DrawModelEx(tile.model, pos, axis, 0, tile.scaleFactor, WHITE);
+		}
+		DrawModelEx(a.model, pos, axis, angle, a.scaleFactor, WHITE);
 	    }
 
-	    DrawModelEx(a.model, pos, axis, angle, a.scaleFactor, WHITE);
 	    pos.x += game->tileSize.x;
 	}
 
 	pos.x = start.x;
 	pos.z += game->tileSize.z;
     }
+}
+
+/*
+__xx_x<
+___x<
+
+_xx_
+_xx<
+
+can only push on one line
+horizontal, vertical
+*/
+void pushBoxes(Game* game, Vector2 nextPosition) {
 }
 
 void movePlayer(Game* game, int deltaX, int deltaY) {
@@ -252,9 +292,9 @@ void movePlayer(Game* game, int deltaX, int deltaY) {
 
     int index = next.y * b.size.x + next.x;
     if (b.pieces[index] == Wall) return;
-    game->player = next;
 
-    // TODO: move boxes along -- kind of like that advent of code problem
+    if (b.pieces[index] == Box) pushBoxes(game, next);
+    game->player = next;
 }
 
 int main() {
@@ -273,7 +313,7 @@ int main() {
 
     while (!WindowShouldClose()) {
 	if (IsKeyPressed(KEY_L)) changeLevel(&game, true);
-	if (IsKeyPressed(KEY_J)) changeLevel(&game, false);
+	if (IsKeyPressed(KEY_H)) changeLevel(&game, false);
 	if (IsKeyPressed(KEY_RIGHT)) movePlayer(&game, 1, 0);
 	if (IsKeyPressed(KEY_LEFT)) movePlayer(&game, -1, 0);
 	if (IsKeyPressed(KEY_UP)) movePlayer(&game, 0, -1);
