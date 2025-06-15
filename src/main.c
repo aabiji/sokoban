@@ -7,16 +7,36 @@
 #include "raymath.h"
 
 typedef enum {
-    Floor, Pusher, Box, BoxOnGoal,
-    Goal, Wall, SplitWall, Corner,
-    PieceEnumSize
-} Piece;
+    Floor, Pusher, Box, Wall, SplitWall,
+    Goal, Corner, ObjectEnumSize
+} Object;
+
+typedef struct {
+    Object obj;
+    bool isGoal; // tile where boxes should be put?
+} Tile;
+
+Tile getTile(char c) {
+    Tile tile = { Floor, false };
+    if (c == '#') tile.obj = Wall;
+    if (c == '@') tile.obj = Pusher;
+    if (c == '$') tile.obj = Box;
+    if (c == '.') {
+	tile.isGoal = true;
+	tile.obj = Goal;
+    }
+    if (c == '*') {
+	tile.isGoal = true;
+	tile.obj = Box;
+    }
+    return tile;
+}
 
 typedef struct {
     Vector2 size;
     int numBytes;
-    Piece* tiles;
-    Piece* original;
+    Tile* tiles;
+    Tile* original;
 } Level;
 
 Level* loadLevels(const char* textFile, int amount) {
@@ -50,7 +70,7 @@ Level* loadLevels(const char* textFile, int amount) {
 		pos.x = pos.y = 0;
 		foundLevelSize = true;
 
-		levels[i].numBytes = levels[i].size.x * levels[i].size.y * sizeof(Piece);
+		levels[i].numBytes = levels[i].size.x * levels[i].size.y * sizeof(Tile);
 		levels[i].tiles = malloc(levels[i].numBytes);
 		levels[i].original = malloc(levels[i].numBytes);
 		memset(levels[i].tiles, Floor, levels[i].numBytes);
@@ -75,13 +95,7 @@ Level* loadLevels(const char* textFile, int amount) {
 	pos.x++;
 	if (foundLevelSize) {
 	    int index = pos.y * levels[i].size.x + pos.x;
-	    Piece p = Floor;
-	    if (*current == '#') p = Wall;
-	    if (*current == '@') p = Pusher;
-	    if (*current == '$') p = Box;
-	    if (*current == '.') p = Goal;
-	    if (*current == '*') p = BoxOnGoal;
-	    levels[i].tiles[index] = p;
+	    levels[i].tiles[index] = getTile(*current);
 	}
     }
 
@@ -118,13 +132,13 @@ Asset loadAsset(const char* path, Vector3 targetSize) {
 
 typedef struct {
     Texture texture;
-    Asset assets[PieceEnumSize];
+    Asset assets[ObjectEnumSize];
     Vector3 tileSize;
 
     Vector2 player;
 
     Level* levels;
-    int goalPositions[20];
+    int goalPositions[30];
     int numLevels;
     int level;
     bool levelSolved;
@@ -143,16 +157,16 @@ void changeLevel(Game* game, bool next) {
     for (int y = 0; y < level.size.y; y++) {
 	for (int x = 0; x < level.size.x; x++) {
 	    int index = y * level.size.x + x;
-	    Piece t = level.original[index];
+	    Tile t = level.original[index];
 
 	    // find the player
-	    if (t == Pusher) {
-		level.tiles[index] = Floor;
+	    if (t.obj == Pusher) {
+		level.tiles[index] = (Tile){ Floor, false };
 		game->player.x = x;
 		game->player.y = y;
 	    }
 
-	    if (t == BoxOnGoal || t == Goal) {
+	    if (t.isGoal) {
 		if (i >= len) {
 		    printf("Too many goals!\n");
 		    break;
@@ -168,15 +182,15 @@ Game newGame() {
 
     // Load the assets
     game.tileSize = (Vector3){ 2, 2, 2 }; 
-    game.assets[Box] = loadAsset("../assets/box_small.gltf", game.tileSize);
-    game.assets[Wall] = loadAsset("../assets/wall.gltf", game.tileSize);
+    game.assets[Box]       = loadAsset("../assets/box_small.gltf", game.tileSize);
+    game.assets[Wall]      = loadAsset("../assets/wall.gltf", game.tileSize);
     game.assets[SplitWall] = loadAsset("../assets/wall_Tsplit.gltf", game.tileSize);
     game.assets[Corner] = loadAsset("../assets/wall_corner.gltf", game.tileSize);
-    game.assets[Floor] = loadAsset("../assets/floor_wood_small_dark.gltf", game.tileSize);
-    game.assets[Goal] = loadAsset("../assets/floor_dirt_small_A.gltf", game.tileSize);
+    game.assets[Floor]  = loadAsset("../assets/floor_wood_small_dark.gltf", game.tileSize);
+    game.assets[Goal]   = loadAsset("../assets/floor_dirt_small_A.gltf", game.tileSize);
     game.assets[Pusher] = loadAsset("../assets/banner_red.gltf", (Vector3){0, 0, 0});
     game.texture = LoadTexture("../assets/dungeon_texture.png");
-    for (int i = 0; i < PieceEnumSize; i++) {
+    for (int i = 0; i < ObjectEnumSize; i++) {
 	Model m = game.assets[i].model;
 	m.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = game.texture;
     }
@@ -202,7 +216,8 @@ void checkProgress(Game* game) {
     for (int i = 0; i < len; i++) {
 	int pos = game->goalPositions[i];
 	if (pos == -1) break; // no more goal positions
-	if (game->levels[game->level].tiles[pos] != Box) {
+	Tile t = game->levels[game->level].tiles[pos];
+	if (t.isGoal && t.obj != Box) {
 	    game->levelSolved = false;
 	    break;
 	}
@@ -220,7 +235,7 @@ void restartGame(Game* game) {
 }
 
 void cleanupGame(Game* game) {
-    for (int i = 0; i < PieceEnumSize; i++) {
+    for (int i = 0; i < ObjectEnumSize; i++) {
 	UnloadModel(game->assets[i].model);
     }
     UnloadTexture(game->texture);
@@ -236,10 +251,10 @@ typedef struct {
 
 Border computeBorder(Level level, int x, int y) {
     int w = level.size.x, h = level.size.y;
-    bool l = x - 1 < 0  || level.tiles[y * w + (x - 1)] != Wall; // left empty?
-    bool r = x + 1 >= w || level.tiles[y * w + (x + 1)] != Wall; // right empty?
-    bool t = y - 1 < 0  || level.tiles[(y - 1) * w + x] != Wall; // top empty?
-    bool b = y + 1 >= h || level.tiles[(y + 1) * w + x] != Wall; // bottom empty?
+    bool l = x - 1 < 0  || level.tiles[y * w + (x - 1)].obj != Wall; // left empty?
+    bool r = x + 1 >= w || level.tiles[y * w + (x + 1)].obj != Wall; // right empty?
+    bool t = y - 1 < 0  || level.tiles[(y - 1) * w + x].obj != Wall; // top empty?
+    bool b = y + 1 >= h || level.tiles[(y + 1) * w + x].obj != Wall; // bottom empty?
 
     // corners
     if (!l && r && t && !b) return (Border){ false, true, 0 };   // top right
@@ -262,7 +277,7 @@ void getFirstAndLastWalls(Level b, int row, int* indexFirst, int* indexLast) {
     *indexLast = 0;
     for (int i = 0; i < b.size.x; i++) {
 	int index = row * b.size.x + i;
-	if (b.tiles[index] == Wall) {
+	if (b.tiles[index].obj == Wall) {
 	    if (i < *indexFirst) *indexFirst = i;
 	    if (i > *indexLast) *indexLast = i;
 	}
@@ -285,25 +300,25 @@ void drawLevel(Game* game) {
 	for (int j = 0; j < level.size.x; j++) {
 	    float angle = 0;
 	    Vector3 axis = {0, 1, 0};
-	    Piece p = level.tiles[i * (int)level.size.x + j];
-	    Asset a = game->assets[p];
+	    Tile t = level.tiles[i * (int)level.size.x + j];
+	    Asset a = game->assets[t.obj];
 
 	    bool player = j == game->player.x && i == game->player.y;
 	    if (player) a = game->assets[Pusher];
 
 	    // Figure out how to draw the wall
-	    if (p == Wall) {
+	    if (t.obj == Wall) {
 		Border b = computeBorder(level, j, i);
 		if (b.corner) a = game->assets[Corner];
 		if (b.splitWall) a = game->assets[SplitWall];
 		angle = b.rotation;
 	    }
 
-	    if (j >= first && j <= last) { // Don't draw outside of the bordering walls
+	    if (j >= first && j <= last) { // If in between the 2 walls
 		// Draw a floor underneath
-		if ((p != Floor && p != Goal) || player) {
-		    Asset tile = player ? a : game->assets[Floor];
-		    DrawModelEx(tile.model, pos, axis, 0, tile.scaleFactor, WHITE);
+		if ((t.obj != Floor && t.obj != Goal) || player) {
+		    Asset temp = t.isGoal ? game->assets[Goal] : game->assets[Floor];
+		    DrawModelEx(temp.model, pos, axis, 0, temp.scaleFactor, WHITE);
 		}
 		DrawModelEx(a.model, pos, axis, angle, a.scaleFactor, WHITE);
 	    }
@@ -321,9 +336,9 @@ void pushBoxes(Level b, Vector2 next, bool* canMove, int x, int y) {
     // We need to figure out where the last box they'll be pushing is
     Vector2 end = next;
     while (true) {
-	Piece p = b.tiles[(int)(end.y * b.size.x + end.x)];
-	if (p != Box) {
-	    *canMove = p != Wall;
+	Tile t = b.tiles[(int)(end.y * b.size.x + end.x)];
+	if (t.obj != Box) {
+	    *canMove = t.obj != Wall;
 	    break;
 	}
 	end.x += x;
@@ -336,10 +351,10 @@ void pushBoxes(Level b, Vector2 next, bool* canMove, int x, int y) {
     if (*canMove) {
 	int endIndex = end.y * b.size.x + end.x;
 	int nextIndex = next.y * b.size.x + next.x;
-	b.tiles[endIndex] = b.tiles[nextIndex];
-	// preserve goal tiles:
-	Piece p = b.original[nextIndex] != Box ? b.original[nextIndex] : Floor;
-	b.tiles[nextIndex] = p;
+	b.tiles[endIndex].obj = b.tiles[nextIndex].obj;
+
+	Object obj = b.original[nextIndex].isGoal ? Goal : Floor;
+	b.tiles[nextIndex].obj = obj;
     }
 }
 
@@ -348,9 +363,9 @@ void movePlayer(Game* game, int deltaX, int deltaY) {
     Vector2 next = { game->player.x + deltaX, game->player.y + deltaY };
 
     int index = next.y * b.size.x + next.x;
-    if (b.tiles[index] == Wall) return;
+    if (b.tiles[index].obj == Wall) return;
 
-    if (b.tiles[index] == Box) {
+    if (b.tiles[index].obj == Box) {
 	bool canPushBoxes = false;
 	pushBoxes(b, next, &canPushBoxes, deltaX, deltaY);
 	if (!canPushBoxes) return;
@@ -361,7 +376,6 @@ void movePlayer(Game* game, int deltaX, int deltaY) {
 }
 
 // TODO: get better 3d models
-//	 extract levels again -- didn't get them properly the first time
 // 	 add menu transition between levels
 // 	 add basic lighting
 // 	 add a basic titlescreen
