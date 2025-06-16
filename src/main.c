@@ -131,18 +131,38 @@ Asset loadAsset(const char* path, Vector3 targetSize) {
 }
 
 typedef struct {
-    Texture texture;
+    Texture textures[3];
     Asset assets[ObjectEnumSize];
     Vector3 tileSize;
 
     Vector2 player;
 
     Level* levels;
-    int goalPositions[30];
+    int goalPositions[40];
     int numLevels;
     int level;
     bool levelSolved;
 } Game;
+
+void loadAssets(Game* game, Vector3 playerScale) {
+    game->assets[Box] = loadAsset("../assets/models/box.obj", game->tileSize);
+    game->assets[Wall] = loadAsset("../assets/models/wall.gltf", game->tileSize);
+    game->assets[SplitWall] = loadAsset("../assets/models/split_wall.gltf", game->tileSize);
+    game->assets[Corner] = loadAsset("../assets/models/corner.gltf", game->tileSize);
+    game->assets[Pusher] = loadAsset("../assets/models/player.obj", playerScale);
+    game->assets[Floor] = loadAsset("../assets/models/floor.obj", game->tileSize);
+    game->assets[Goal] = loadAsset("../assets/models/goal.obj", game->tileSize);
+
+    game->textures[0] = LoadTexture("../assets/models/texture1.png");
+    game->textures[1] = LoadTexture("../assets/models/texture2.png");
+    game->textures[2] = LoadTexture("../assets/models/texture3.png");
+
+    for (int i = 0; i < ObjectEnumSize; i++) {
+	Model m = game->assets[i].model;
+	int t = i == Floor || i == Goal || i == Pusher ? 2 : 1;
+	m.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = game->textures[t];
+    }
+}
 
 void changeLevel(Game* game, bool next) {
     game->level = next ? game->level + 1 : game->level - 1;
@@ -182,21 +202,11 @@ Game newGame() {
 
     // Load the assets
     game.tileSize = (Vector3){ 2, 2, 2 }; 
-    game.assets[Box]       = loadAsset("../assets/box_small.gltf", game.tileSize);
-    game.assets[Wall]      = loadAsset("../assets/wall.gltf", game.tileSize);
-    game.assets[SplitWall] = loadAsset("../assets/wall_Tsplit.gltf", game.tileSize);
-    game.assets[Corner] = loadAsset("../assets/wall_corner.gltf", game.tileSize);
-    game.assets[Floor]  = loadAsset("../assets/floor_wood_small_dark.gltf", game.tileSize);
-    game.assets[Goal]   = loadAsset("../assets/floor_dirt_small_A.gltf", game.tileSize);
-    game.assets[Pusher] = loadAsset("../assets/banner_red.gltf", (Vector3){0, 0, 0});
-    game.texture = LoadTexture("../assets/dungeon_texture.png");
-    for (int i = 0; i < ObjectEnumSize; i++) {
-	Model m = game.assets[i].model;
-	m.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = game.texture;
-    }
+    Vector3 playerScale = (Vector3){3.5, 3.5, 3.5};
+    loadAssets(&game, playerScale);
 
     // Load each level and keep an original copy of them
-    game.numLevels = 55;
+    game.numLevels = 53;
     game.levels = loadLevels("../src/levels.txt", game.numLevels);
     for (int i = 0; i < game.numLevels; i++) {
 	memcpy(game.levels[i].original, game.levels[i].tiles, game.levels[i].numBytes);
@@ -238,7 +248,10 @@ void cleanupGame(Game* game) {
     for (int i = 0; i < ObjectEnumSize; i++) {
 	UnloadModel(game->assets[i].model);
     }
-    UnloadTexture(game->texture);
+
+    for (int i = 0; i < 3; i++) {
+	UnloadTexture(game->textures[i]);
+    }
 
     cleanupLevels(game->levels, game->numLevels);
 }
@@ -409,7 +422,8 @@ int main() {
 	camera.position.y += GetMouseWheelMove();
 
 	BeginDrawing();
-	ClearBackground(RAYWHITE);
+	ClearBackground((Color){ 135, 206, 235, 255 });
+
 	DrawText(TextFormat("%d", game.level + 1), 20, 10, 20, BLACK);
 	if (game.levelSolved)
 	    DrawText("level solved!", 20, 10, 20, BLACK);
