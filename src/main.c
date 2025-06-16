@@ -138,7 +138,7 @@ typedef struct {
     Vector2 player;
 
     Level* levels;
-    int goalPositions[40];
+    int goalPositions[45];
     int numLevels;
     int level;
     bool levelSolved;
@@ -388,8 +388,9 @@ void movePlayer(Game* game, int deltaX, int deltaY) {
     checkProgress(game);
 }
 
-// TODO: get better 3d models
-// 	 add menu transition between levels
+// TODO: add menu transition between levels
+//       many levels are already solved -- remove them
+//       automatically center the camera in a top down view
 // 	 add basic lighting
 // 	 add a basic titlescreen
 // 	 add ui buttons
@@ -410,6 +411,8 @@ int main() {
     camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };
     camera.projection = CAMERA_PERSPECTIVE;
 
+    Font font = LoadFont("../assets/fonts/super-bubble.ttf");
+
     while (!WindowShouldClose()) {
 	if (IsKeyPressed(KEY_L)) changeLevel(&game, true);
 	if (IsKeyPressed(KEY_H)) changeLevel(&game, false);
@@ -424,7 +427,8 @@ int main() {
 	BeginDrawing();
 	ClearBackground((Color){ 135, 206, 235, 255 });
 
-	DrawText(TextFormat("%d", game.level + 1), 20, 10, 20, BLACK);
+	const char* str = TextFormat("%d", game.level + 1);
+	DrawTextEx(font, str, (Vector2){ 20, 10 }, 30, 0, WHITE);
 	if (game.levelSolved)
 	    DrawText("level solved!", 20, 10, 20, BLACK);
 
