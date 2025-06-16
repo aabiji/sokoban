@@ -133,9 +133,11 @@ Asset loadAsset(const char* path, Vector3 targetSize) {
 typedef struct {
     Texture textures[3];
     Asset assets[ObjectEnumSize];
-    Vector3 tileSize;
 
+    Vector3 tileSize;
+    Vector3 levelOffset;
     Vector2 player;
+    Camera3D camera;
 
     Level* levels;
     int goalPositions[45];
@@ -143,6 +145,30 @@ typedef struct {
     int level;
     bool levelSolved;
 } Game;
+
+void centerTopdownCamera(Game* game) {
+    // setup the camera
+    float w = game->levels[game->level].size.x * game->tileSize.x;
+    float h = game->levels[game->level].size.y * game->tileSize.y;
+
+    // TODO: need to center level  (levelOffset is wrong)
+    game->levelOffset = (Vector3){
+	-w / 2.0f + game->tileSize.x / 2.0f,
+        0.0f,
+        -h / 2.0f + game->tileSize.y / 2.0f
+    };
+    Vector3 center = { w / 2.0, 0, h / 2.0 };
+
+    // How high the camera needs to be to be able to fully see the longest side
+    float longerSide = fmax(w, h);
+    float cameraHeight = (longerSide / 2.0) / tanf((45 * DEG2RAD) / 2.0);
+
+    game->camera.fovy = 45;
+    game->camera.target = center;
+    game->camera.position = (Vector3){ center.x, cameraHeight, center.z };
+    game->camera.up = (Vector3){ 0.0f, 0.0f, -1.0f };
+    game->camera.projection = CAMERA_PERSPECTIVE;
+}
 
 void loadAssets(Game* game, Vector3 playerScale) {
     game->assets[Box] = loadAsset("../assets/models/box.obj", game->tileSize);
@@ -195,6 +221,8 @@ void changeLevel(Game* game, bool next) {
 	    }
 	}
     }
+
+    centerTopdownCamera(game);
 }
 
 Game newGame() {
@@ -215,7 +243,6 @@ Game newGame() {
     game.level = -1;
     game.levelSolved = false;
     changeLevel(&game, true);
-
     return game;
 }
 
@@ -299,12 +326,7 @@ void getFirstAndLastWalls(Level b, int row, int* indexFirst, int* indexLast) {
 
 void drawLevel(Game* game) {
     Level level = game->levels[game->level];
-
-    Vector2 start = {
-	-(floor(level.size.x / 2)) * game->tileSize.x,
-	-(floor(level.size.y / 2)) * game->tileSize.y,
-    };
-    Vector3 pos = { start.x, 0, start.y };
+    Vector3 pos = game->levelOffset;
 
     for (int i = 0; i < level.size.y; i++) {
 	int first, last;
@@ -339,7 +361,7 @@ void drawLevel(Game* game) {
 	    pos.x += game->tileSize.x;
 	}
 
-	pos.x = start.x;
+	pos.x = game->levelOffset.x;
 	pos.z += game->tileSize.z;
     }
 }
@@ -404,14 +426,7 @@ int main() {
 
     Game game = newGame();
 
-    Camera3D camera;
-    camera.fovy = 45;
-    camera.position = (Vector3){ 0.0f, 15.0f, 10.0f };
-    camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };
-    camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };
-    camera.projection = CAMERA_PERSPECTIVE;
-
-    Font font = LoadFont("../assets/fonts/super-bubble.ttf");
+    Font font = LoadFont("../assets/fonts/Worktalk.ttf");
 
     while (!WindowShouldClose()) {
 	if (IsKeyPressed(KEY_L)) changeLevel(&game, true);
@@ -422,8 +437,6 @@ int main() {
 	if (IsKeyPressed(KEY_UP)) movePlayer(&game, 0, -1);
 	if (IsKeyPressed(KEY_DOWN)) movePlayer(&game, 0, 1);
 
-	camera.position.y += GetMouseWheelMove();
-
 	BeginDrawing();
 	ClearBackground((Color){ 135, 206, 235, 255 });
 
@@ -432,7 +445,7 @@ int main() {
 	if (game.levelSolved)
 	    DrawText("level solved!", 20, 10, 20, BLACK);
 
-	BeginMode3D(camera);
+	BeginMode3D(game.camera);
 	drawLevel(&game);
 	EndMode3D();
 
