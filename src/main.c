@@ -135,9 +135,10 @@ typedef struct {
     Asset assets[ObjectEnumSize];
 
     Vector3 tileSize;
-    Vector3 levelOffset;
-    Vector2 player;
     Camera3D camera;
+
+    Vector2 player;
+    float playerRotation;
 
     Level* levels;
     int goalPositions[45];
@@ -150,13 +151,6 @@ void centerTopdownCamera(Game* game) {
     // setup the camera
     float w = game->levels[game->level].size.x * game->tileSize.x;
     float h = game->levels[game->level].size.y * game->tileSize.y;
-
-    // TODO: need to center level  (levelOffset is wrong)
-    game->levelOffset = (Vector3){
-	-w / 2.0f + game->tileSize.x / 2.0f,
-        0.0f,
-        -h / 2.0f + game->tileSize.y / 2.0f
-    };
     Vector3 center = { w / 2.0, 0, h / 2.0 };
 
     // How high the camera needs to be to be able to fully see the longest side
@@ -165,7 +159,7 @@ void centerTopdownCamera(Game* game) {
 
     game->camera.fovy = 45;
     game->camera.target = center;
-    game->camera.position = (Vector3){ center.x, cameraHeight, center.z };
+    game->camera.position = (Vector3){ center.x, cameraHeight + 1, center.z };
     game->camera.up = (Vector3){ 0.0f, 0.0f, -1.0f };
     game->camera.projection = CAMERA_PERSPECTIVE;
 }
@@ -210,6 +204,7 @@ void changeLevel(Game* game, bool next) {
 		level.tiles[index] = (Tile){ Floor, false };
 		game->player.x = x;
 		game->player.y = y;
+		game->playerRotation = 0;
 	    }
 
 	    if (t.isGoal) {
@@ -229,7 +224,7 @@ Game newGame() {
     Game game;
 
     // Load the assets
-    game.tileSize = (Vector3){ 2, 2, 2 }; 
+    game.tileSize = (Vector3){ 2.5, 2.5, 2.5 }; 
     Vector3 playerScale = (Vector3){3.5, 3.5, 3.5};
     loadAssets(&game, playerScale);
 
@@ -326,7 +321,7 @@ void getFirstAndLastWalls(Level b, int row, int* indexFirst, int* indexLast) {
 
 void drawLevel(Game* game) {
     Level level = game->levels[game->level];
-    Vector3 pos = game->levelOffset;
+    Vector3 pos = { 0, 0, game->tileSize.y / 2 };
 
     for (int i = 0; i < level.size.y; i++) {
 	int first, last;
@@ -339,7 +334,10 @@ void drawLevel(Game* game) {
 	    Asset a = game->assets[t.obj];
 
 	    bool player = j == game->player.x && i == game->player.y;
-	    if (player) a = game->assets[Pusher];
+	    if (player) {
+		a = game->assets[Pusher];
+		angle = game->playerRotation;
+	    }
 
 	    // Figure out how to draw the wall
 	    if (t.obj == Wall) {
@@ -361,7 +359,7 @@ void drawLevel(Game* game) {
 	    pos.x += game->tileSize.x;
 	}
 
-	pos.x = game->levelOffset.x;
+	pos.x = 0;
 	pos.z += game->tileSize.z;
     }
 }
@@ -397,6 +395,11 @@ void movePlayer(Game* game, int deltaX, int deltaY) {
     Level b = game->levels[game->level];
     Vector2 next = { game->player.x + deltaX, game->player.y + deltaY };
 
+    if (deltaX ==  1) game->playerRotation = 90;
+    if (deltaX == -1) game->playerRotation = 270;
+    if (deltaY ==  1) game->playerRotation = 0;
+    if (deltaY == -1) game->playerRotation = 180;
+
     int index = next.y * b.size.x + next.x;
     if (b.tiles[index].obj == Wall) return;
 
@@ -405,14 +408,13 @@ void movePlayer(Game* game, int deltaX, int deltaY) {
 	pushBoxes(b, next, &canPushBoxes, deltaX, deltaY);
 	if (!canPushBoxes) return;
     }
-
+    
     game->player = next;
     checkProgress(game);
 }
 
 // TODO: add menu transition between levels
 //       many levels are already solved -- remove them
-//       automatically center the camera in a top down view
 // 	 add basic lighting
 // 	 add a basic titlescreen
 // 	 add ui buttons
@@ -427,6 +429,8 @@ int main() {
     Game game = newGame();
 
     Font font = LoadFont("../assets/fonts/Worktalk.ttf");
+    Color bg = { 135, 206, 235, 255 };
+    Color text = { 160, 82, 45, 255 };
 
     while (!WindowShouldClose()) {
 	if (IsKeyPressed(KEY_L)) changeLevel(&game, true);
@@ -438,12 +442,12 @@ int main() {
 	if (IsKeyPressed(KEY_DOWN)) movePlayer(&game, 0, 1);
 
 	BeginDrawing();
-	ClearBackground((Color){ 135, 206, 235, 255 });
+	ClearBackground(bg);
 
 	const char* str = TextFormat("%d", game.level + 1);
-	DrawTextEx(font, str, (Vector2){ 20, 10 }, 30, 0, WHITE);
+	DrawTextEx(font, str, (Vector2){ 20, 10 }, 30, 0, text);
 	if (game.levelSolved)
-	    DrawText("level solved!", 20, 10, 20, BLACK);
+	    DrawTextEx(font, "Solved!", (Vector2){ 20, 40 }, 30, 0, text);
 
 	BeginMode3D(game.camera);
 	drawLevel(&game);
