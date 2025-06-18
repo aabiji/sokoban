@@ -3,8 +3,12 @@
 #include <string.h>
 #include <math.h>
 
-#include "raylib.h"
-#include "raymath.h"
+#if defined(PLATFORM_WEB)
+    #include <emscripten/emscripten.h>
+#endif
+
+#include <raylib.h>
+#include <raymath.h>
 
 typedef enum {
     Floor, Pusher, Box, Wall, SplitWall,
@@ -131,6 +135,7 @@ Asset loadAsset(const char* path, Vector3 targetSize) {
 }
 
 typedef struct {
+    Font font;
     Texture textures[3];
     Asset assets[ObjectEnumSize];
 
@@ -165,17 +170,19 @@ void centerTopdownCamera(Game* game) {
 }
 
 void loadAssets(Game* game, Vector3 playerScale) {
-    game->assets[Box] = loadAsset("../assets/models/box.obj", game->tileSize);
-    game->assets[Wall] = loadAsset("../assets/models/wall.gltf", game->tileSize);
-    game->assets[SplitWall] = loadAsset("../assets/models/split_wall.gltf", game->tileSize);
-    game->assets[Corner] = loadAsset("../assets/models/corner.gltf", game->tileSize);
-    game->assets[Pusher] = loadAsset("../assets/models/player.obj", playerScale);
-    game->assets[Floor] = loadAsset("../assets/models/floor.obj", game->tileSize);
-    game->assets[Goal] = loadAsset("../assets/models/goal.obj", game->tileSize);
+    game->font = LoadFont("assets/fonts/Worktalk.ttf");
 
-    game->textures[0] = LoadTexture("../assets/models/texture1.png");
-    game->textures[1] = LoadTexture("../assets/models/texture2.png");
-    game->textures[2] = LoadTexture("../assets/models/texture3.png");
+    game->assets[Box] = loadAsset("assets/models/box.obj", game->tileSize);
+    game->assets[Wall] = loadAsset("assets/models/wall.gltf", game->tileSize);
+    game->assets[SplitWall] = loadAsset("assets/models/split_wall.gltf", game->tileSize);
+    game->assets[Corner] = loadAsset("assets/models/corner.gltf", game->tileSize);
+    game->assets[Pusher] = loadAsset("assets/models/player.obj", playerScale);
+    game->assets[Floor] = loadAsset("assets/models/floor.obj", game->tileSize);
+    game->assets[Goal] = loadAsset("assets/models/goal.obj", game->tileSize);
+
+    game->textures[0] = LoadTexture("assets/models/texture1.png");
+    game->textures[1] = LoadTexture("assets/models/texture2.png");
+    game->textures[2] = LoadTexture("assets/models/texture3.png");
 
     for (int i = 0; i < ObjectEnumSize; i++) {
 	Model m = game->assets[i].model;
@@ -206,13 +213,8 @@ void changeLevel(Game* game, bool next) {
 		game->playerRotation = 0;
 	    }
 
-	    if (t.isGoal) {
-		if (i >= len) {
-		    printf("Too many goals!\n");
-		    break;
-		}
-		game->goalPositions[i++] = index;	
-	    }
+	    if (t.isGoal)
+		game->goalPositions[i++] = index;
 	}
     }
 
@@ -230,7 +232,7 @@ Game newGame() {
     // Load each level and keep an original copy of them
     int len = 50;
     game.levels = calloc(len, sizeof(Level));
-    loadLevels("../src/levels.txt", game.levels, 50, &game.numLevels);
+    loadLevels("assets/levels.txt", game.levels, 50, &game.numLevels);
     for (int i = 0; i < game.numLevels; i++) {
 	memcpy(game.levels[i].original, game.levels[i].tiles, game.levels[i].numBytes);
     }
@@ -414,48 +416,58 @@ void movePlayer(Game* game, int deltaX, int deltaY) {
     checkProgress(game);
 }
 
+void updateGame(void* data) {
+    Game* game = (Game*)data;
+
+    Color bg = { 135, 206, 235, 255 };
+    Color text = { 160, 82, 45, 255 };
+
+    if (IsKeyPressed(KEY_L)) changeLevel(game, true);
+    if (IsKeyPressed(KEY_H)) changeLevel(game, false);
+    if (IsKeyPressed(KEY_R)) restartGame(game);
+    if (IsKeyPressed(KEY_RIGHT)) movePlayer(game, 1, 0);
+    if (IsKeyPressed(KEY_LEFT)) movePlayer(game, -1, 0);
+    if (IsKeyPressed(KEY_UP)) movePlayer(game, 0, -1);
+    if (IsKeyPressed(KEY_DOWN)) movePlayer(game, 0, 1);
+
+    BeginDrawing();
+    ClearBackground(bg);
+
+    const char* str = TextFormat("%d", game->level + 1);
+    DrawTextEx(game->font, str, (Vector2){ 20, 10 }, 30, 0, text);
+    if (game->levelSolved)
+	DrawTextEx(game->font, "Solved!", (Vector2){ 20, 40 }, 30, 0, text);
+
+    BeginMode3D(game->camera);
+    drawLevel(game);
+    EndMode3D();
+
+    EndDrawing();
+}
+
 // TODO: when we restart we should restart the player position (can't be on the box tiles)
 // TODO: add menu transition between levels
 // Look here: https://store.steampowered.com/app/2478340/Sokoban_3D/
 // 	 add basic lighting
 // 	 add a basic titlescreen
 // 	 add ui buttons
-// 	 port to web and mobile
+// 	 port to mobile
 // 	 release
 
 int main() {
     SetTraceLogLevel(LOG_WARNING);
     InitWindow(800, 600, "Sokoban");
-    SetTargetFPS(60);
 
     Game game = newGame();
 
-    Font font = LoadFont("../assets/fonts/Worktalk.ttf");
-    Color bg = { 135, 206, 235, 255 };
-    Color text = { 160, 82, 45, 255 };
+#if defined(PLATFORM_WEB)
+    emscripten_set_main_loop_arg(updateGame, &game, 60, 1);
+#else
+    SetTargetFPS(60);
+#endif
 
     while (!WindowShouldClose()) {
-	if (IsKeyPressed(KEY_L)) changeLevel(&game, true);
-	if (IsKeyPressed(KEY_H)) changeLevel(&game, false);
-	if (IsKeyPressed(KEY_R)) restartGame(&game);
-	if (IsKeyPressed(KEY_RIGHT)) movePlayer(&game, 1, 0);
-	if (IsKeyPressed(KEY_LEFT)) movePlayer(&game, -1, 0);
-	if (IsKeyPressed(KEY_UP)) movePlayer(&game, 0, -1);
-	if (IsKeyPressed(KEY_DOWN)) movePlayer(&game, 0, 1);
-
-	BeginDrawing();
-	ClearBackground(bg);
-
-	const char* str = TextFormat("%d", game.level + 1);
-	DrawTextEx(font, str, (Vector2){ 20, 10 }, 30, 0, text);
-	if (game.levelSolved)
-	    DrawTextEx(font, "Solved!", (Vector2){ 20, 40 }, 30, 0, text);
-
-	BeginMode3D(game.camera);
-	drawLevel(&game);
-	EndMode3D();
-
-	EndDrawing();
+	updateGame(&game);
     }
 
     cleanupGame(&game);
