@@ -10,6 +10,15 @@
 #include <raylib.h>
 #include <raymath.h>
 
+void centerText(
+    Font font, Vector2 point, const char* text,
+    int fontSize, int spacing, Color color
+) {
+    Vector2 size = MeasureTextEx(font, text, fontSize, spacing);
+    Vector2 p = { point.x - size.x / 2, point.y - size.y / 2 };
+    DrawTextEx(font, text, p, fontSize, spacing, color);
+}
+
 typedef enum {
     Floor, Pusher, Box, Wall, SplitWall,
     Goal, Corner, ObjectEnumSize
@@ -191,9 +200,8 @@ void loadAssets(Game* game, Vector3 playerScale) {
     }
 }
 
-void changeLevel(Game* game, bool next) {
-    game->level = next ? game->level + 1 : game->level - 1;
-    game->level = Clamp(game->level, 0, game->numLevels - 1);
+void changeLevel(Game* game, int index) {
+    game->level = Clamp(index, 0, game->numLevels - 1);
     Level level = game->levels[game->level];
 
     int i = 0;
@@ -237,9 +245,8 @@ Game newGame() {
 	memcpy(game.levels[i].original, game.levels[i].tiles, game.levels[i].numBytes);
     }
 
-    game.level = -1;
     game.levelSolved = false;
-    changeLevel(&game, true);
+    changeLevel(&game, 0);
     return game;
 }
 
@@ -264,8 +271,7 @@ void restartGame(Game* game) {
 	game->levels[game->level].original,
 	game->levels[game->level].numBytes
     );
-    game->level--;
-    changeLevel(game, true);
+    changeLevel(game, game->level);
 }
 
 void cleanupGame(Game* game) {
@@ -416,14 +422,12 @@ void movePlayer(Game* game, int deltaX, int deltaY) {
     checkProgress(game);
 }
 
-void updateGame(void* data) {
-    Game* game = (Game*)data;
-
+void gameloop(Game* game) {
     Color bg = { 135, 206, 235, 255 };
     Color text = { 160, 82, 45, 255 };
 
-    if (IsKeyPressed(KEY_L)) changeLevel(game, true);
-    if (IsKeyPressed(KEY_H)) changeLevel(game, false);
+    if (IsKeyPressed(KEY_L)) changeLevel(game, game->level + 1);
+    if (IsKeyPressed(KEY_H)) changeLevel(game, game->level - 1);
     if (IsKeyPressed(KEY_R)) restartGame(game);
     if (IsKeyPressed(KEY_RIGHT)) movePlayer(game, 1, 0);
     if (IsKeyPressed(KEY_LEFT)) movePlayer(game, -1, 0);
@@ -433,10 +437,13 @@ void updateGame(void* data) {
     BeginDrawing();
     ClearBackground(bg);
 
-    const char* str = TextFormat("%d", game->level + 1);
-    DrawTextEx(game->font, str, (Vector2){ 20, 10 }, 30, 0, text);
+    const char* str = TextFormat("Level %d", game->level + 1);
+    centerText(game->font, (Vector2){ 75, 25 }, str, 30, 0, text);
+    // TODO: level, box / boxes, # moves
+
     if (game->levelSolved)
 	DrawTextEx(game->font, "Solved!", (Vector2){ 20, 40 }, 30, 0, text);
+	// TODO: show transition animation and transition to the next level (smooth fade in?)
 
     BeginMode3D(game->camera);
     drawLevel(game);
@@ -445,31 +452,95 @@ void updateGame(void* data) {
     EndDrawing();
 }
 
-// TODO: when we restart we should restart the player position (can't be on the box tiles)
-// TODO: add menu transition between levels
-// Look here: https://store.steampowered.com/app/2478340/Sokoban_3D/
+// TODO: refactor source into multiple files
+//	 debug wall rendering
+//	 add a smooth fade in transition
+//	 add character animation
+//	 sound effects and a chill soundtrack
 // 	 add basic lighting
-// 	 add a basic titlescreen
-// 	 add ui buttons
-// 	 port to mobile
+// 	 nicer menu screen
+// 	 port to web and mobile
 // 	 release
+
+typedef struct {
+    Game game;
+    enum { MENU_SCREEN, GAME_SCREEN } state;
+} App;
+
+void drawMenu(App* app) {
+    BeginDrawing();
+    ClearBackground(BLACK);
+
+    centerText(app->game.font, (Vector2){ (float)GetScreenWidth() / 2, 50 }, "Sokoban", 45, 0, WHITE);
+
+    float cols = 10;
+    int rows = app->game.numLevels / cols;
+    float amount = cols + ((cols + 1) / 2); // The columns and the space in between them
+    float boxSize = GetScreenWidth() / amount;
+
+    Vector2 pos = { boxSize / 2, 100 };
+    bool hovering = false;
+
+    for (int row = 0; row < rows; row++) {
+	for (int col = 0; col < cols; col++) {
+	    int level = row * 10 + col;
+	    Rectangle r = {pos.x, pos.y, boxSize, boxSize };
+	    DrawRectangleRounded(r, 0.2, 0, GRAY);
+
+	    const char* str = TextFormat("%d", level + 1);
+	    Vector2 p = { r.x + boxSize / 2, r.y + boxSize / 2 };
+	    centerText(app->game.font, p, str, 20, 0, WHITE);
+
+	    Vector2 cursor = GetMousePosition();
+	    if (cursor.x >= r.x && cursor.y >= r.y &&
+		cursor.x <= r.x + r.width && cursor.y <= r.y + r.height) {
+		hovering = true;
+		if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+		    app->state = GAME_SCREEN;
+		    changeLevel(&app->game, level);
+		    break;
+		}
+	    }
+
+	    pos.x += boxSize * 1.5;
+	}
+	pos.y += boxSize * 1.5;
+	pos.x = boxSize / 2;
+    }
+
+    Vector2 bottom = {(float)GetScreenWidth() / 2, GetScreenHeight() - 50 };
+    centerText(app->game.font, bottom, "(C) 2025- @aabiji", 15, 0, WHITE);
+    EndDrawing();
+
+    if (hovering)
+	SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+    else
+	SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+}
+
+void updateApp(void* data) {
+    App* app = (App*)data;
+    if (app->state == MENU_SCREEN)
+	drawMenu(app);
+    else
+	gameloop(&app->game);
+}
 
 int main() {
     SetTraceLogLevel(LOG_WARNING);
     InitWindow(800, 600, "Sokoban");
 
-    Game game = newGame();
+    App app = { newGame(), MENU_SCREEN };
 
 #if defined(PLATFORM_WEB)
-    emscripten_set_main_loop_arg(updateGame, &game, 60, 1);
+    emscripten_set_main_loop_arg(updateGameWrapper, &app, 60, 1);
 #else
     SetTargetFPS(60);
+    while (!WindowShouldClose()) {
+        updateApp(&app);
+    }
 #endif
 
-    while (!WindowShouldClose()) {
-	updateGame(&game);
-    }
-
-    cleanupGame(&game);
+    cleanupGame(&app.game);
     CloseWindow();
 }
