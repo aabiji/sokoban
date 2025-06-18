@@ -39,7 +39,8 @@ typedef struct {
     Tile* original;
 } Level;
 
-Level* loadLevels(const char* textFile, int amount) {
+// NOTE: the file must end in a newline
+void loadLevels(const char* textFile, Level* buffer, int bufferLength, int* levelsRead) {
     char* source = LoadFileText(textFile);
 
     char* prev = NULL;
@@ -49,7 +50,6 @@ Level* loadLevels(const char* textFile, int amount) {
     Vector3 pos = { 0, 0 };
     bool foundLevelSize = false;
 
-    Level* levels = calloc(amount, sizeof(Level));
     int i = 0;
 
     while (*current != '\0') {
@@ -63,21 +63,21 @@ Level* loadLevels(const char* textFile, int amount) {
  
 	    if (newline && !foundLevelSize) {
 		// backtrace, since
-		// we do a first pass to get the size of the levels
+		// we do a first pass to get the size of the buffer
 		// then another pass to get the contents of the level
 		current = levelStart;
-		levels[i].size.y = pos.y;
+		buffer[i].size.y = pos.y;
 		pos.x = pos.y = 0;
 		foundLevelSize = true;
 
-		levels[i].numBytes = levels[i].size.x * levels[i].size.y * sizeof(Tile);
-		levels[i].tiles = malloc(levels[i].numBytes);
-		levels[i].original = malloc(levels[i].numBytes);
-		memset(levels[i].tiles, Floor, levels[i].numBytes);
+		buffer[i].numBytes = buffer[i].size.x * buffer[i].size.y * sizeof(Tile);
+		buffer[i].tiles = malloc(buffer[i].numBytes);
+		buffer[i].original = malloc(buffer[i].numBytes);
+		memset(buffer[i].tiles, Floor, buffer[i].numBytes);
 		continue;
 	    } else if (newline && foundLevelSize) {
 		// Read the level size and the level contents, move on to the next one
-		if (++i >= amount) break;
+		if (++i >= bufferLength) break;
 		pos.x = pos.y = 0;
 		foundLevelSize = false;
 		levelStart = current;
@@ -85,7 +85,7 @@ Level* loadLevels(const char* textFile, int amount) {
 	    }
 
 	    // new row
-	    levels[i].size.x = fmax(levels[i].size.x, pos.x + 1); // linex can be different lengths
+	    buffer[i].size.x = fmax(buffer[i].size.x, pos.x + 1); // linex can be different lengths
 	    pos.x = 0;
 	    pos.y++;
 	    continue;
@@ -94,13 +94,13 @@ Level* loadLevels(const char* textFile, int amount) {
 	// Read the level contents
 	pos.x++;
 	if (foundLevelSize) {
-	    int index = pos.y * levels[i].size.x + pos.x;
-	    levels[i].tiles[index] = getTile(*current);
+	    int index = pos.y * buffer[i].size.x + pos.x;
+	    buffer[i].tiles[index] = getTile(*current);
 	}
     }
 
+    *levelsRead = i;
     UnloadFileText(source);
-    return levels;
 }
 
 void cleanupLevels(Level* levels, int amount) {
@@ -141,7 +141,7 @@ typedef struct {
     float playerRotation;
 
     Level* levels;
-    int goalPositions[45];
+    int goalPositions[100];
     int numLevels;
     int level;
     bool levelSolved;
@@ -201,7 +201,6 @@ void changeLevel(Game* game, bool next) {
 
 	    // find the player
 	    if (t.obj == Pusher) {
-		level.tiles[index] = (Tile){ Floor, false };
 		game->player.x = x;
 		game->player.y = y;
 		game->playerRotation = 0;
@@ -229,8 +228,9 @@ Game newGame() {
     loadAssets(&game, playerScale);
 
     // Load each level and keep an original copy of them
-    game.numLevels = 53;
-    game.levels = loadLevels("../src/levels.txt", game.numLevels);
+    int len = 50;
+    game.levels = calloc(len, sizeof(Level));
+    loadLevels("../src/levels.txt", game.levels, 50, &game.numLevels);
     for (int i = 0; i < game.numLevels; i++) {
 	memcpy(game.levels[i].original, game.levels[i].tiles, game.levels[i].numBytes);
     }
@@ -337,7 +337,8 @@ void drawLevel(Game* game) {
 	    if (player) {
 		a = game->assets[Pusher];
 		angle = game->playerRotation;
-	    }
+	    } else if (!player && t.obj == Pusher)
+		a = game->assets[Floor]; // Ignore the default player position
 
 	    // Figure out how to draw the wall
 	    if (t.obj == Wall) {
@@ -413,8 +414,9 @@ void movePlayer(Game* game, int deltaX, int deltaY) {
     checkProgress(game);
 }
 
+// TODO: when we restart we should restart the player position (can't be on the box tiles)
 // TODO: add menu transition between levels
-//       many levels are already solved -- remove them
+// Look here: https://store.steampowered.com/app/2478340/Sokoban_3D/
 // 	 add basic lighting
 // 	 add a basic titlescreen
 // 	 add ui buttons
