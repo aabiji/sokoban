@@ -10,13 +10,21 @@
 #include <raylib.h>
 #include <raymath.h>
 
-void centerText(
+// Draw text centered at a point and return its bounding box
+Rectangle centerText(
     Font font, Vector2 point, const char* text,
     int fontSize, int spacing, Color color
 ) {
     Vector2 size = MeasureTextEx(font, text, fontSize, spacing);
     Vector2 p = { point.x - size.x / 2, point.y - size.y / 2 };
     DrawTextEx(font, text, p, fontSize, spacing, color);
+    return (Rectangle){ p.x, p.y, size.x, size.y };
+}
+
+const bool mouseInside(Rectangle r) {
+    Vector2 p = GetMousePosition();
+    return p.x >= r.x && p.x <= r.x + r.width &&
+	   p.y >= r.y && p.y <= r.y + r.height;
 }
 
 typedef enum {
@@ -161,6 +169,10 @@ typedef struct {
     bool levelSolved;
 } Game;
 
+typedef enum { MENU_SCREEN, GAME_SCREEN } AppState;
+
+typedef struct { Game game; AppState state; } App;
+
 void centerTopdownCamera(Game* game) {
     // setup the camera
     float w = game->levels[game->level].size.x * game->tileSize.x;
@@ -173,7 +185,7 @@ void centerTopdownCamera(Game* game) {
 
     game->camera.fovy = 45;
     game->camera.target = center;
-    game->camera.position = (Vector3){ center.x, cameraHeight + 1, center.z };
+    game->camera.position = (Vector3){ center.x, cameraHeight, center.z };
     game->camera.up = (Vector3){ 0.0f, 0.0f, -1.0f };
     game->camera.projection = CAMERA_PERSPECTIVE;
 }
@@ -200,8 +212,8 @@ void loadAssets(Game* game, Vector3 playerScale) {
     }
 }
 
-void changeLevel(Game* game, int index) {
-    game->level = Clamp(index, 0, game->numLevels - 1);
+void changeLevel(Game* game, int levelIndex) {
+    game->level = Clamp(levelIndex, 0, game->numLevels - 1);
     Level level = game->levels[game->level];
 
     int i = 0;
@@ -422,50 +434,40 @@ void movePlayer(Game* game, int deltaX, int deltaY) {
     checkProgress(game);
 }
 
-void gameloop(Game* game) {
+void gameloop(App* app) {
     Color bg = { 135, 206, 235, 255 };
     Color text = { 160, 82, 45, 255 };
 
-    if (IsKeyPressed(KEY_L)) changeLevel(game, game->level + 1);
-    if (IsKeyPressed(KEY_H)) changeLevel(game, game->level - 1);
-    if (IsKeyPressed(KEY_R)) restartGame(game);
-    if (IsKeyPressed(KEY_RIGHT)) movePlayer(game, 1, 0);
-    if (IsKeyPressed(KEY_LEFT)) movePlayer(game, -1, 0);
-    if (IsKeyPressed(KEY_UP)) movePlayer(game, 0, -1);
-    if (IsKeyPressed(KEY_DOWN)) movePlayer(game, 0, 1);
+    if (IsKeyPressed(KEY_R)) restartGame(&app->game);
+    if (IsKeyPressed(KEY_RIGHT)) movePlayer(&app->game, 1, 0);
+    if (IsKeyPressed(KEY_LEFT)) movePlayer(&app->game, -1, 0);
+    if (IsKeyPressed(KEY_UP)) movePlayer(&app->game, 0, -1);
+    if (IsKeyPressed(KEY_DOWN)) movePlayer(&app->game, 0, 1);
 
     BeginDrawing();
     ClearBackground(bg);
 
-    const char* str = TextFormat("Level %d", game->level + 1);
-    centerText(game->font, (Vector2){ 75, 25 }, str, 30, 0, text);
-    // TODO: level, box / boxes, # moves
-
-    if (game->levelSolved)
-	DrawTextEx(game->font, "Solved!", (Vector2){ 20, 40 }, 30, 0, text);
-	// TODO: show transition animation and transition to the next level (smooth fade in?)
-
-    BeginMode3D(game->camera);
-    drawLevel(game);
+    BeginMode3D(app->game.camera);
+    drawLevel(&app->game);
     EndMode3D();
+
+    // Draw the sidebar of text
+    Rectangle box = centerText(app->game.font, (Vector2){ 50, 25 }, "< Menu", 20, 0, WHITE);
+    if (mouseInside(box) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+	// TODO: show transition
+	app->state = MENU_SCREEN;
+    }
+
+    const char* str = TextFormat("Level %d", app->game.level + 1);
+    centerText(app->game.font, (Vector2){ 75, 55 }, str, 30, 0, text);
+
+    // TODO: level, box / boxes, # moves
+    if (app->game.levelSolved)
+	// TODO: show transition animation and transition to the next level (smooth fade in?)
+	DrawTextEx(app->game.font, "Solved!", (Vector2){ 20, 40 }, 30, 0, text);
 
     EndDrawing();
 }
-
-// TODO: refactor source into multiple files
-//	 debug wall rendering
-//	 add a smooth fade in transition
-//	 add character animation
-//	 sound effects and a chill soundtrack
-// 	 add basic lighting
-// 	 nicer menu screen
-// 	 port to web and mobile
-// 	 release
-
-typedef struct {
-    Game game;
-    enum { MENU_SCREEN, GAME_SCREEN } state;
-} App;
 
 void drawMenu(App* app) {
     BeginDrawing();
@@ -476,9 +478,11 @@ void drawMenu(App* app) {
     float cols = 10;
     int rows = app->game.numLevels / cols;
     float amount = cols + ((cols + 1) / 2); // The columns and the space in between them
-    float boxSize = GetScreenWidth() / amount;
+    float w = GetScreenWidth() > 1000 ? 900 : GetScreenWidth();
+    float boxSize = w / amount;
 
-    Vector2 pos = { boxSize / 2, 100 };
+    float startX = ((GetScreenWidth() - boxSize * amount) / 2) + (boxSize / 2);
+    Vector2 pos = { startX, 100 };
     bool hovering = false;
 
     for (int row = 0; row < rows; row++) {
@@ -491,9 +495,7 @@ void drawMenu(App* app) {
 	    Vector2 p = { r.x + boxSize / 2, r.y + boxSize / 2 };
 	    centerText(app->game.font, p, str, 20, 0, WHITE);
 
-	    Vector2 cursor = GetMousePosition();
-	    if (cursor.x >= r.x && cursor.y >= r.y &&
-		cursor.x <= r.x + r.width && cursor.y <= r.y + r.height) {
+	    if (mouseInside(r)) {
 		hovering = true;
 		if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
 		    app->state = GAME_SCREEN;
@@ -505,7 +507,7 @@ void drawMenu(App* app) {
 	    pos.x += boxSize * 1.5;
 	}
 	pos.y += boxSize * 1.5;
-	pos.x = boxSize / 2;
+	pos.x = startX;
     }
 
     Vector2 bottom = {(float)GetScreenWidth() / 2, GetScreenHeight() - 50 };
@@ -523,11 +525,26 @@ void updateApp(void* data) {
     if (app->state == MENU_SCREEN)
 	drawMenu(app);
     else
-	gameloop(&app->game);
+	gameloop(app);
 }
+
+// TODO: refactor source into multiple files
+//	 debug wall rendering
+//	 why are there lines when drawing certain levels?
+//	 draw levels we've completed in a different color
+//	 store the levels we've finished
+//	 polish (different hover animations, etc)
+//	 add a smooth fade in transition
+//	 add character animation
+//	 sound effects and a chill soundtrack
+// 	 add basic lighting
+// 	 nicer menu screen
+// 	 port to web and mobile
+// 	 release
 
 int main() {
     SetTraceLogLevel(LOG_WARNING);
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(800, 600, "Sokoban");
 
     App app = { newGame(), MENU_SCREEN };
