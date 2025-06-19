@@ -27,6 +27,23 @@ const bool mouseInside(Rectangle r) {
 	   p.y >= r.y && p.y <= r.y + r.height;
 }
 
+typedef struct { bool solvedLevels[50]; } SaveData;
+
+int saveGameData(SaveData data, const char* file) {
+    FILE* fp = fopen(file, "wb");
+    if (fp == NULL) return -1;
+    fwrite(&data, sizeof(SaveData), 1, fp);
+    fclose(fp);
+    return 0;
+}
+
+int readGameData(SaveData* data, const char* file) {
+    FILE* fp = fopen(file, "rb");
+    if (fp == NULL) return -1;
+    int numRead = fread(data, sizeof(SaveData), 1, fp);
+    return numRead == -1 ? -1 : 0;
+}
+
 typedef enum {
     Floor, Pusher, Box, Wall, SplitWall,
     Goal, Corner, ObjectEnumSize
@@ -161,6 +178,7 @@ typedef struct {
 
     Vector2 player;
     float playerRotation;
+    SaveData playerData;
 
     Level* levels;
     int goalPositions[100];
@@ -171,7 +189,11 @@ typedef struct {
 
 typedef enum { MENU_SCREEN, GAME_SCREEN } AppState;
 
-typedef struct { Game game; AppState state; } App;
+typedef struct {
+    Game game;
+    AppState state;
+    bool quit;
+} App;
 
 void centerTopdownCamera(Game* game) {
     // setup the camera
@@ -241,7 +263,7 @@ void changeLevel(Game* game, int levelIndex) {
     centerTopdownCamera(game);
 }
 
-Game newGame() {
+Game createGame() {
     Game game;
 
     // Load the assets
@@ -257,8 +279,11 @@ Game newGame() {
 	memcpy(game.levels[i].original, game.levels[i].tiles, game.levels[i].numBytes);
     }
 
+    int val = readGameData(&game.playerData, "assets/save.dat");
+    if (val != 0) // reset to defaults if we couldn't read the file
+	memset(game.playerData.solvedLevels, 0, sizeof(game.playerData.solvedLevels));
+
     game.levelSolved = false;
-    changeLevel(&game, 0);
     return game;
 }
 
@@ -462,9 +487,11 @@ void gameloop(App* app) {
     centerText(app->game.font, (Vector2){ 75, 55 }, str, 30, 0, text);
 
     // TODO: level, box / boxes, # moves
-    if (app->game.levelSolved)
+    if (app->game.levelSolved) {
 	// TODO: show transition animation and transition to the next level (smooth fade in?)
 	DrawTextEx(app->game.font, "Solved!", (Vector2){ 20, 40 }, 30, 0, text);
+	app->game.playerData.solvedLevels[app->game.level] = true;
+    }
 
     EndDrawing();
 }
@@ -489,7 +516,8 @@ void drawMenu(App* app) {
 	for (int col = 0; col < cols; col++) {
 	    int level = row * 10 + col;
 	    Rectangle r = {pos.x, pos.y, boxSize, boxSize };
-	    DrawRectangleRounded(r, 0.2, 0, GRAY);
+	    Color c = app->game.playerData.solvedLevels[level] ? GREEN : GRAY;
+	    DrawRectangleRounded(r, 0.2, 0, c);
 
 	    const char* str = TextFormat("%d", level + 1);
 	    Vector2 p = { r.x + boxSize / 2, r.y + boxSize / 2 };
@@ -522,6 +550,13 @@ void drawMenu(App* app) {
 
 void updateApp(void* data) {
     App* app = (App*)data;
+
+    if (WindowShouldClose()) {
+	saveGameData(app->game.playerData, "assets/save.dat");
+	app->quit = true;
+	return;
+    }
+
     if (app->state == MENU_SCREEN)
 	drawMenu(app);
     else
@@ -529,6 +564,7 @@ void updateApp(void* data) {
 }
 
 // TODO: refactor source into multiple files
+//	 loading levels is pretty slow...
 //	 debug wall rendering
 //	 why are there lines when drawing certain levels?
 //	 draw levels we've completed in a different color
@@ -547,15 +583,13 @@ int main() {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(800, 600, "Sokoban");
 
-    App app = { newGame(), MENU_SCREEN };
+    App app = { createGame(), MENU_SCREEN, false };
 
 #if defined(PLATFORM_WEB)
     emscripten_set_main_loop_arg(updateGameWrapper, &app, 60, 1);
 #else
     SetTargetFPS(60);
-    while (!WindowShouldClose()) {
-        updateApp(&app);
-    }
+    while (!app.quit) updateApp(&app);
 #endif
 
     cleanupGame(&app.game);
