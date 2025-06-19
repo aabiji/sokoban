@@ -32,7 +32,6 @@ typedef struct {
     int goalPositions[100];
     int numLevels;
     int level;
-    bool levelSolved;
 } Game;
 
 Game createGame();
@@ -41,8 +40,10 @@ void cleanupGame(Game* game);
 
 void drawLevel(Game* game);
 void changeLevel(Game* game, int levelIndex);
+void advanceLevel(Game* game);
 
-void movePlayer(Game* game, int deltaX, int deltaY);
 int savePlayerData(Game* game);
+// Move the player and return true if the player has completed the level
+bool movePlayer(Game* game, int deltaX, int deltaY);
 
 #endif

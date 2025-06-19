@@ -1,17 +1,25 @@
+#include "raylib.h"
 #if defined(PLATFORM_WEB)
     #include <emscripten/emscripten.h>
 #endif
 
 #include "game.h"
 
-typedef enum { MENU_SCREEN, GAME_SCREEN } AppState;
-
 typedef struct {
     Game game;
-    AppState state;
-    bool quit;
     SaveData playerData;
+    bool drawingMenu;
+    bool quit;
+    float fadeTime;
 } App;
+
+App createApp() {
+    App app;
+    app.game = createGame();
+    app.quit = false;
+    app.fadeTime = 0;
+    return app;
+}
 
 // Draw text centered at a point and return its bounding box
 Rectangle centerText(
@@ -28,6 +36,37 @@ const bool mouseInside(Rectangle r) {
     Vector2 p = GetMousePosition();
     return p.x >= r.x && p.x <= r.x + r.width &&
 	   p.y >= r.y && p.y <= r.y + r.height;
+}
+
+float easeInOutQuad(float t) {
+    return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) *t;
+}
+
+// Draw a fullscreen overlay that gradually fades out over time
+void drawFadeAnimation(App* app) {
+    // Setting fadeTime >= 0 triggers the animation
+    if (app->fadeTime < 0) return;
+
+    float alpha = 255.0 - (255.0 * easeInOutQuad(app->fadeTime));
+
+    float duration = 0.5; // seconds 
+    app->fadeTime += GetFrameTime() / duration;
+
+    DrawRectangle(
+	0, 0, GetScreenWidth(), GetScreenHeight(),
+	(Color){ 0, 0, 0, alpha });
+
+    if (app->fadeTime >= 1.0)
+	app->fadeTime = -1; // stop the animation
+}
+
+Color brightenColor(Color c, float amount) {
+    Color new;
+    new.r = (c.r + (255 - c.r) * amount);
+    new.g = (c.g + (255 - c.g) * amount);
+    new.b = (c.b + (255 - c.b) * amount);
+    new.a = 255;
+    return new;
 }
 
 void drawMenu(App* app) {
@@ -51,20 +90,23 @@ void drawMenu(App* app) {
 	    int level = row * 10 + col;
 	    Rectangle r = {pos.x, pos.y, boxSize, boxSize };
 	    Color c = app->game.data.solvedLevels[level] ? GREEN : GRAY;
+
+	    if (mouseInside(r)) {
+		hovering = true;
+		c = brightenColor(c, 0.2);
+		if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+		    app->drawingMenu = false;
+		    changeLevel(&app->game, level);
+		    app->fadeTime = 0;
+		    break;
+		}
+	    }
+
 	    DrawRectangleRounded(r, 0.2, 0, c);
 
 	    const char* str = TextFormat("%d", level + 1);
 	    Vector2 p = { r.x + boxSize / 2, r.y + boxSize / 2 };
 	    centerText(app->game.font, p, str, 20, 0, WHITE);
-
-	    if (mouseInside(r)) {
-		hovering = true;
-		if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-		    app->state = GAME_SCREEN;
-		    changeLevel(&app->game, level);
-		    break;
-		}
-	    }
 
 	    pos.x += boxSize * 1.5;
 	}
@@ -74,6 +116,8 @@ void drawMenu(App* app) {
 
     Vector2 bottom = {(float)GetScreenWidth() / 2, GetScreenHeight() - 50 };
     centerText(app->game.font, bottom, "(C) 2025- @aabiji", 15, 0, WHITE);
+
+    drawFadeAnimation(app);
     EndDrawing();
 
     if (hovering)
@@ -82,41 +126,50 @@ void drawMenu(App* app) {
 	SetMouseCursor(MOUSE_CURSOR_DEFAULT);
 }
 
-void gameloop(App* app) {
-    Color bg = { 135, 206, 235, 255 };
-    Color text = { 160, 82, 45, 255 };
+void drawGameInfo(App* app) {
+    Color color = { 160, 82, 45, 255 };
 
-    if (IsKeyPressed(KEY_R)) restartGame(&app->game);
-    if (IsKeyPressed(KEY_RIGHT)) movePlayer(&app->game, 1, 0);
-    if (IsKeyPressed(KEY_LEFT)) movePlayer(&app->game, -1, 0);
-    if (IsKeyPressed(KEY_UP)) movePlayer(&app->game, 0, -1);
-    if (IsKeyPressed(KEY_DOWN)) movePlayer(&app->game, 0, 1);
+    // Draw the sidebar of text
+    Rectangle box = centerText(app->game.font, (Vector2){ 50, 25 }, "< Menu", 20, 0, WHITE);
+    if (mouseInside(box) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+	app->drawingMenu = true;
+	app->fadeTime = 0;
+    }
+
+    const char* str = TextFormat("Level %d", app->game.level + 1);
+    centerText(app->game.font, (Vector2){ 75, 55 }, str, 30, 0, color);
+    // TODO: level, box / boxes, # moves
+}
+
+void gameloop(App* app) {
+    bool levelSolved = false;
+
+    if (IsKeyPressed(KEY_RIGHT))
+	levelSolved = movePlayer(&app->game, 1, 0);
+    if (IsKeyPressed(KEY_LEFT))
+	levelSolved = movePlayer(&app->game, -1, 0);
+    if (IsKeyPressed(KEY_UP))
+	levelSolved = movePlayer(&app->game, 0, -1);
+    if (IsKeyPressed(KEY_DOWN))
+	levelSolved = movePlayer(&app->game, 0, 1);
+    if (IsKeyPressed(KEY_R))
+	restartGame(&app->game);
 
     BeginDrawing();
-    ClearBackground(bg);
+    ClearBackground((Color){ 135, 206, 235, 255 });
 
     BeginMode3D(app->game.camera);
     drawLevel(&app->game);
     EndMode3D();
 
-    // Draw the sidebar of text
-    Rectangle box = centerText(app->game.font, (Vector2){ 50, 25 }, "< Menu", 20, 0, WHITE);
-    if (mouseInside(box) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-	// TODO: show transition
-	app->state = MENU_SCREEN;
-    }
-
-    const char* str = TextFormat("Level %d", app->game.level + 1);
-    centerText(app->game.font, (Vector2){ 75, 55 }, str, 30, 0, text);
-
-    // TODO: level, box / boxes, # moves
-    if (app->game.levelSolved) {
-	// TODO: show transition animation and transition to the next level (smooth fade in?)
-	DrawTextEx(app->game.font, "Solved!", (Vector2){ 20, 40 }, 30, 0, text);
-	app->game.data.solvedLevels[app->game.level] = true;
-    }
-
+    drawGameInfo(app);
+    drawFadeAnimation(app);
     EndDrawing();
+
+    if (levelSolved) {
+	advanceLevel(&app->game);
+	app->fadeTime = 0;
+    }
 }
 
 void updateApp(void* data) {
@@ -128,7 +181,7 @@ void updateApp(void* data) {
 	return;
     }
 
-    if (app->state == MENU_SCREEN)
+    if (app->drawingMenu)
 	drawMenu(app);
     else
 	gameloop(app);
@@ -137,10 +190,7 @@ void updateApp(void* data) {
 // TODO: loading levels is pretty slow...
 //	 debug wall rendering
 //	 why are there lines when drawing certain levels?
-//	 draw levels we've completed in a different color
-//	 store the levels we've finished
 //	 polish (different hover animations, etc)
-//	 add a smooth fade in transition
 //	 add character animation
 //	 sound effects and a chill soundtrack
 // 	 add basic lighting
@@ -153,7 +203,7 @@ int main() {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(800, 600, "Sokoban");
 
-    App app = { createGame(), MENU_SCREEN, false };
+    App app = createApp();
 
 #if defined(PLATFORM_WEB)
     emscripten_set_main_loop_arg(updateGameWrapper, &app, 60, 1);

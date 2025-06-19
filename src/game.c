@@ -86,6 +86,11 @@ void changeLevel(Game* game, int levelIndex) {
     centerTopdownCamera(game);
 }
 
+void advanceLevel(Game *game) {
+    game->data.solvedLevels[game->level] = true;
+    changeLevel(game, game->level + 1);
+}
+
 int savePlayerData(Game* game) {
     FILE* fp = fopen(game->saveFile, "wb");
     if (fp == NULL) return -1;
@@ -124,7 +129,6 @@ Game createGame() {
     if (val != 0) // reset to defaults if we couldn't read the file
 	memset(game.data.solvedLevels, 0, sizeof(game.data.solvedLevels));
 
-    game.levelSolved = false;
     return game;
 }
 
@@ -149,8 +153,7 @@ void cleanupGame(Game* game) {
     cleanupLevels(game->levels, game->numLevels);
 }
 
-void checkProgress(Game* game) {
-    game->levelSolved = true;
+bool levelComplete(Game* game) {
     int len = sizeof(game->goalPositions) / sizeof(int);
 
     for (int i = 0; i < len; i++) {
@@ -158,10 +161,11 @@ void checkProgress(Game* game) {
 	if (pos == -1) break; // no more goal positions
 	Tile t = game->levels[game->level].tiles[pos];
 	if (t.isGoal && t.obj != Box) {
-	    game->levelSolved = false;
-	    break;
+	    return false;
 	}
     }
+
+    return true;
 }
 
 typedef struct {
@@ -278,7 +282,7 @@ void pushBoxes(Level b, Vector2 next, bool* canMove, int x, int y) {
     }
 }
 
-void movePlayer(Game* game, int deltaX, int deltaY) {
+bool movePlayer(Game* game, int deltaX, int deltaY) {
     Level b = game->levels[game->level];
     Vector2 next = { game->player.x + deltaX, game->player.y + deltaY };
 
@@ -288,14 +292,14 @@ void movePlayer(Game* game, int deltaX, int deltaY) {
     if (deltaY == -1) game->playerRotation = 180;
 
     int index = next.y * b.size.x + next.x;
-    if (b.tiles[index].obj == Wall) return;
+    if (b.tiles[index].obj == Wall) return false;
 
     if (b.tiles[index].obj == Box) {
 	bool canPushBoxes = false;
 	pushBoxes(b, next, &canPushBoxes, deltaX, deltaY);
-	if (!canPushBoxes) return;
+	if (!canPushBoxes) return false;
     }
     
     game->player = next;
-    checkProgress(game);
+    return levelComplete(game);
 }
