@@ -11,8 +11,12 @@ typedef struct {
 } Asset;
 
 typedef struct {
-    bool solvedLevels[50];
-} SaveData;
+    int numMoves;
+    float rotation;
+    Vector2 position;
+    // solved[levelIndex] == true if the level has been solved
+    bool solved[NUM_LEVELS];
+} Player;
 
 typedef struct {
     Font font;
@@ -22,16 +26,12 @@ typedef struct {
     Vector3 tileSize;
     Camera3D camera;
 
-    Vector2 player;
-    float playerRotation;
-
+    Player player;
     const char* saveFile;
-    SaveData data;
 
+    int level;
     Level* levels;
     int goalPositions[100];
-    int numLevels;
-    int level;
 } Game;
 
 Game createGame();

@@ -20,7 +20,7 @@ Tile getTile(char c) {
     return tile;
 }
 
-void loadLevels(char* source, Level* buffer, int bufferLength, int* levelsRead) {
+int parseLevels(char* source, Level* buffer, int bufferLength) {
     char* prev = NULL;
     char* current = source;
     char* levelStart = source;
@@ -77,11 +77,11 @@ void loadLevels(char* source, Level* buffer, int bufferLength, int* levelsRead) 
 	}
     }
 
-    *levelsRead = i;
+    return i;
 }
 
-void cleanupLevels(Level* levels, int amount) {
-    for (int i = 0; i < amount; i++) {
+void cleanupLevels(Level* levels, int count) {
+    for (int i = 0; i < count; i++) {
 	free(levels[i].tiles);
 	free(levels[i].original);
     }

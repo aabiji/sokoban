@@ -4,6 +4,8 @@
 #include <raymath.h>
 #include <stdbool.h>
 
+#define NUM_LEVELS 50
+
 typedef enum {
     Floor, Pusher, Box, Wall, SplitWall,
     Goal, Corner, ObjectEnumSize
@@ -21,8 +23,9 @@ typedef struct {
     Tile* original;
 } Level;
 
+// Parse all the levels from the file and return the number of levels parsed
 // NOTE: the file must end in a newline
-void loadLevels(char* source, Level* buffer, int bufferLength, int* levelsRead);
+int parseLevels(char* source, Level* buffer, int bufferLength);
 void cleanupLevels(Level* levels, int amount);
 
 #endif

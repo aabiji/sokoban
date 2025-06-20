@@ -1,29 +1,33 @@
+#include "game.h"
+#include "levels.h"
 #include "raylib.h"
+
 #if defined(PLATFORM_WEB)
     #include <emscripten/emscripten.h>
 #endif
 
-#include "game.h"
-
 typedef struct {
     Game game;
-    SaveData playerData;
+
     bool drawingMenu;
     bool quit;
     float fadeTime;
+ 
+    Color bg;
 } App;
 
 App createApp() {
     App app;
     app.game = createGame();
     app.quit = false;
-    app.fadeTime = 0;
+    app.drawingMenu = true;
+    app.fadeTime = -1;
     return app;
 }
 
 // Draw text centered at a point and return its bounding box
 Rectangle centerText(
-    Font font, Vector2 point, const char* text,
+    Font font, const char* text, Vector2 point,
     int fontSize, int spacing, Color color
 ) {
     Vector2 size = MeasureTextEx(font, text, fontSize, spacing);
@@ -70,13 +74,15 @@ Color brightenColor(Color c, float amount) {
 }
 
 void drawMenu(App* app) {
-    BeginDrawing();
-    ClearBackground(BLACK);
-
-    centerText(app->game.font, (Vector2){ (float)GetScreenWidth() / 2, 50 }, "Sokoban", 45, 0, WHITE);
+    centerText(
+	app->game.font,
+	"Sokoban",
+	(Vector2){ (float)GetScreenWidth() / 2, 50 },
+	45, 0, WHITE
+    );
 
     float cols = 10;
-    int rows = app->game.numLevels / cols;
+    int rows = NUM_LEVELS / cols;
     float amount = cols + ((cols + 1) / 2); // The columns and the space in between them
     float w = GetScreenWidth() > 1000 ? 900 : GetScreenWidth();
     float boxSize = w / amount;
@@ -88,8 +94,10 @@ void drawMenu(App* app) {
     for (int row = 0; row < rows; row++) {
 	for (int col = 0; col < cols; col++) {
 	    int level = row * 10 + col;
-	    Rectangle r = {pos.x, pos.y, boxSize, boxSize };
-	    Color c = app->game.data.solvedLevels[level] ? GREEN : GRAY;
+	    Rectangle r = { pos.x, pos.y, boxSize, boxSize };
+	    Color lightGreen = (Color){ 71, 194, 120, 255 };
+	    Color darkGreen = (Color){ 32, 137, 107, 255 };
+	    Color c = app->game.player.solved[level] ? darkGreen : lightGreen;
 
 	    if (mouseInside(r)) {
 		hovering = true;
@@ -106,7 +114,7 @@ void drawMenu(App* app) {
 
 	    const char* str = TextFormat("%d", level + 1);
 	    Vector2 p = { r.x + boxSize / 2, r.y + boxSize / 2 };
-	    centerText(app->game.font, p, str, 20, 0, WHITE);
+	    centerText(app->game.font, str, p, 20, 0, WHITE);
 
 	    pos.x += boxSize * 1.5;
 	}
@@ -115,10 +123,8 @@ void drawMenu(App* app) {
     }
 
     Vector2 bottom = {(float)GetScreenWidth() / 2, GetScreenHeight() - 50 };
-    centerText(app->game.font, bottom, "(C) 2025- @aabiji", 15, 0, WHITE);
-
+    centerText(app->game.font, "(C) 2025- @aabiji", bottom, 15, 0, WHITE);
     drawFadeAnimation(app);
-    EndDrawing();
 
     if (hovering)
 	SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
@@ -127,18 +133,28 @@ void drawMenu(App* app) {
 }
 
 void drawGameInfo(App* app) {
-    Color color = { 160, 82, 45, 255 };
+    Color c = (Color){ 210, 125, 45, 255 };
 
     // Draw the sidebar of text
-    Rectangle box = centerText(app->game.font, (Vector2){ 50, 25 }, "< Menu", 20, 0, WHITE);
-    if (mouseInside(box) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-	app->drawingMenu = true;
-	app->fadeTime = 0;
+    Rectangle box = centerText(app->game.font, "<", (Vector2){ 20, 25 }, 50, 0, WHITE);
+    if (mouseInside(box)) {
+	SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+	if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+	    app->drawingMenu = true;
+	    app->fadeTime = 0;
+	}
+    } else {
+	SetMouseCursor(MOUSE_CURSOR_DEFAULT);
     }
 
     const char* str = TextFormat("Level %d", app->game.level + 1);
-    centerText(app->game.font, (Vector2){ 75, 55 }, str, 30, 0, color);
-    // TODO: level, box / boxes, # moves
+    DrawTextEx(app->game.font, str, (Vector2){ 45, 12 }, 30, 0, c);
+
+    const char* str1 = TextFormat("%d moves", app->game.player.numMoves);
+    DrawTextEx(app->game.font, str1, (Vector2){ 45, 52 }, 30, 0, c);
+
+    const char* str2 = TextFormat("%d / %d", 10, 20);
+    DrawTextEx(app->game.font, str2, (Vector2){ 45, 92 }, 30, 0, c);
 }
 
 void gameloop(App* app) {
@@ -155,16 +171,12 @@ void gameloop(App* app) {
     if (IsKeyPressed(KEY_R))
 	restartGame(&app->game);
 
-    BeginDrawing();
-    ClearBackground((Color){ 135, 206, 235, 255 });
-
     BeginMode3D(app->game.camera);
     drawLevel(&app->game);
     EndMode3D();
 
     drawGameInfo(app);
     drawFadeAnimation(app);
-    EndDrawing();
 
     if (levelSolved) {
 	advanceLevel(&app->game);
@@ -181,26 +193,33 @@ void updateApp(void* data) {
 	return;
     }
 
+    BeginDrawing();
+    ClearBackground((Color){ 135, 206, 235, 234 });
+
     if (app->drawingMenu)
 	drawMenu(app);
     else
 	gameloop(app);
+
+    EndDrawing();
 }
 
 // TODO: loading levels is pretty slow...
-//	 debug wall rendering
+//	 improve wall rendering
 //	 why are there lines when drawing certain levels?
 //	 polish (different hover animations, etc)
 //	 add character animation
 //	 sound effects and a chill soundtrack
 // 	 add basic lighting
-// 	 nicer menu screen
+// 	 nicer level selection screen
+// 	 add hjkl as alternative to arrow keys
 // 	 port to web and mobile
 // 	 release
 
 int main() {
     SetTraceLogLevel(LOG_WARNING);
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    SetConfigFlags(FLAG_MSAA_4X_HINT);
     InitWindow(800, 600, "Sokoban");
 
     App app = createApp();

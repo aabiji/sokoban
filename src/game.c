@@ -3,6 +3,8 @@
 #include <string.h>
 
 #include "game.h"
+#include "levels.h"
+#include "raylib.h"
 
 Asset loadAsset(const char* path, Vector3 targetSize) {
     Asset asset;
@@ -19,7 +21,7 @@ Asset loadAsset(const char* path, Vector3 targetSize) {
 }
 
 void loadAssets(Game* game, Vector3 playerScale) {
-    game->font = LoadFont("assets/fonts/Worktalk.ttf");
+    game->font = LoadFont("assets/fonts/Grobold.ttf");
 
     game->assets[Box] = loadAsset("assets/models/box.obj", game->tileSize);
     game->assets[Wall] = loadAsset("assets/models/wall.gltf", game->tileSize);
@@ -57,8 +59,26 @@ void centerTopdownCamera(Game* game) {
     game->camera.projection = CAMERA_PERSPECTIVE;
 }
 
+void loadLevels(Game* game) {
+    char* source = LoadFileText("assets/levels.txt");
+    game->levels = calloc(NUM_LEVELS, sizeof(Level));
+
+    int numRead = parseLevels(source, game->levels, NUM_LEVELS);
+    if (numRead != NUM_LEVELS) {
+	printf("Coulnd't read the levels properly"); // TODO: tell user!
+	exit(-1);
+    }
+
+    // Keep an original copy of all the levels
+    for (int i = 0; i < NUM_LEVELS; i++) {
+	memcpy(game->levels[i].original, game->levels[i].tiles, game->levels[i].numBytes);
+    }
+
+    UnloadFileText(source);
+}
+
 void changeLevel(Game* game, int levelIndex) {
-    game->level = Clamp(levelIndex, 0, game->numLevels - 1);
+    game->level = Clamp(levelIndex, 0, NUM_LEVELS - 1);
     Level level = game->levels[game->level];
 
     int i = 0;
@@ -73,9 +93,10 @@ void changeLevel(Game* game, int levelIndex) {
 
 	    // find the player
 	    if (t.obj == Pusher) {
-		game->player.x = x;
-		game->player.y = y;
-		game->playerRotation = 0;
+		game->player.position.x = x;
+		game->player.position.y = y;
+		game->player.rotation = 0;
+		game->player.numMoves = 0;
 	    }
 
 	    if (t.isGoal)
@@ -87,22 +108,23 @@ void changeLevel(Game* game, int levelIndex) {
 }
 
 void advanceLevel(Game *game) {
-    game->data.solvedLevels[game->level] = true;
+    game->player.solved[game->level] = true;
     changeLevel(game, game->level + 1);
+    game->player.rotation = GetRandomValue(0, 4) * 90;
 }
 
 int savePlayerData(Game* game) {
     FILE* fp = fopen(game->saveFile, "wb");
     if (fp == NULL) return -1;
-    fwrite(&game->data, sizeof(SaveData), 1, fp);
+    fwrite(&game->player, sizeof(Player), 1, fp);
     fclose(fp);
     return 0;
 }
 
-int readGameData(Game* game) {
+int readPlayerData(Game* game) {
     FILE* fp = fopen(game->saveFile, "rb");
     if (fp == NULL) return -1;
-    int numRead = fread(&game->data, sizeof(SaveData), 1, fp);
+    int numRead = fread(&game->player, sizeof(Player), 1, fp);
     return numRead == -1 ? -1 : 0;
 }
 
@@ -114,21 +136,13 @@ Game createGame() {
     Vector3 playerScale = (Vector3){3.5, 3.5, 3.5};
     loadAssets(&game, playerScale);
 
-    // Load each level and keep an original copy of them
-    int len = 50;
-    char* source = LoadFileText("assets/levels.txt");
-    game.levels = calloc(len, sizeof(Level));
-    loadLevels(source, game.levels, len, &game.numLevels);
-    for (int i = 0; i < game.numLevels; i++) {
-	memcpy(game.levels[i].original, game.levels[i].tiles, game.levels[i].numBytes);
-    }
-    UnloadFileText(source);
-
+    // Load the player data
     game.saveFile = "assets/save.dat";
-    int val = readGameData(&game);
+    int val = readPlayerData(&game);
     if (val != 0) // reset to defaults if we couldn't read the file
-	memset(game.data.solvedLevels, 0, sizeof(game.data.solvedLevels));
+	memset(&game.player, 0, sizeof(Player));
 
+    loadLevels(&game);
     return game;
 }
 
@@ -150,7 +164,7 @@ void cleanupGame(Game* game) {
 	UnloadTexture(game->textures[i]);
     }
 
-    cleanupLevels(game->levels, game->numLevels);
+    cleanupLevels(game->levels, NUM_LEVELS);
 }
 
 bool levelComplete(Game* game) {
@@ -223,10 +237,10 @@ void drawLevel(Game* game) {
 	    Tile t = level.tiles[i * (int)level.size.x + j];
 	    Asset a = game->assets[t.obj];
 
-	    bool player = j == game->player.x && i == game->player.y;
+	    bool player = j == game->player.position.x && i == game->player.position.y;
 	    if (player) {
 		a = game->assets[Pusher];
-		angle = game->playerRotation;
+		angle = game->player.rotation;
 	    } else if (!player && t.obj == Pusher)
 		a = game->assets[Floor]; // Ignore the default player position
 
@@ -284,12 +298,12 @@ void pushBoxes(Level b, Vector2 next, bool* canMove, int x, int y) {
 
 bool movePlayer(Game* game, int deltaX, int deltaY) {
     Level b = game->levels[game->level];
-    Vector2 next = { game->player.x + deltaX, game->player.y + deltaY };
+    Vector2 next = { game->player.position.x + deltaX, game->player.position.y + deltaY };
 
-    if (deltaX ==  1) game->playerRotation = 90;
-    if (deltaX == -1) game->playerRotation = 270;
-    if (deltaY ==  1) game->playerRotation = 0;
-    if (deltaY == -1) game->playerRotation = 180;
+    if (deltaX ==  1) game->player.rotation = 90;
+    if (deltaX == -1) game->player.rotation = 270;
+    if (deltaY ==  1) game->player.rotation = 0;
+    if (deltaY == -1) game->player.rotation = 180;
 
     int index = next.y * b.size.x + next.x;
     if (b.tiles[index].obj == Wall) return false;
@@ -300,6 +314,7 @@ bool movePlayer(Game* game, int deltaX, int deltaY) {
 	if (!canPushBoxes) return false;
     }
     
-    game->player = next;
+    game->player.position = next;
+    game->player.numMoves++;
     return levelComplete(game);
 }
