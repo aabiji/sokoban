@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #define NUM_LEVELS 50
+#define MAX_LINES 40
 #define MAX_GOAL_INDEXES 100
 
 typedef struct {
@@ -27,7 +28,7 @@ typedef struct {
     Piece* original;
 } Level;
 
-int parseLevels(char *source, Level levels[NUM_LEVELS]);
+int parseLevels(char* filePath, Level* levels);
 bool levelCompleted(Level* level);
 
 #endif

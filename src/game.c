@@ -10,13 +10,11 @@ Game createGame() {
     Game game;
 
     // Load the levels
-    char *source = LoadFileText("assets/levels.txt");
-    int value = parseLevels(source, game.levels);
+    int value = parseLevels("assets/levels.txt", game.levels);
     if (value == -1) { // TODO: tell user!
-        printf("error parsing the levels");
+        printf("error loading the levels");
         exit(-1);
     }
-    UnloadFileText(source);
 
     // Load the player data
     game.saveFile = "assets/save.dat";
@@ -56,22 +54,27 @@ void centerTopdownCamera(Game *game) {
     game->camera.projection = CAMERA_PERSPECTIVE;
 }
 
-void changeLevel(Game *game, int levelIndex, bool advance) {
+void initPlayer(Game* game, int x, int y) {
+    game->player.numMoves = 0;
+    game->player.position.t = -1;
+    game->player.position.vector.start = (Vector2){ x, y };
+    game->player.position.vector.end = (Vector2){ x, y };
+    game->player.rotation.t = -1;
+    game->player.rotation.scalar.start = 0;
+    game->player.rotation.scalar.end = 0;
+}
+
+void changeLevel(Game* game, int levelIndex, bool advance) {
     if (advance) levelIndex = game->level + 1;
     game->level = fmax(0, fmin(levelIndex, NUM_LEVELS - 1));
 
     centerTopdownCamera(game);
 
     Level* level = &game->levels[game->level];
-    Vector2 pos = { level->playerStartX, level->playerStartY };
-    game->player.numMoves = 0;
-    game->player.position.vector.start = pos;
-    game->player.position.vector.end = pos;
-    game->player.rotation.scalar.start = 0;
-    game->player.rotation.scalar.end = 0;
+    initPlayer(game, level->playerStartX, level->playerStartY);
 }
 
-void restartLevel(Game *game) {
+void restartLevel(Game* game) {
     Level* l = &game->levels[game->level];
     int size = l->width * l->height * sizeof(Piece);
     memcpy(l->pieces, l->original, size);
@@ -82,7 +85,7 @@ void getFirstAndLastWalls(Level* level, int row, int *first, int *last) {
     *first = level->width;
     *last = 0;
     for (int i = 0; i < level->width; i++) {
-        int index = row * level->height + i;
+        int index = row * level->width + i;
         if (level->pieces[index].type == Border) {
             if (i < *first) *first = i;
             if (i > *last) *last = i;

@@ -34,7 +34,8 @@ static float interpolateScalar(Animation a) {
 }
 
 static void updateAnimation(Animation* a, float deltaTime, float duration) {
-    a->t = fmax(1.0, a->t + deltaTime / duration);
+    if (a->t >= 0 && a->t < 1.0)
+        a->t += deltaTime / duration;
 }
 
 static void startRotationAnimation(Animation *a, float nextAngle) {

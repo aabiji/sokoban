@@ -212,8 +212,7 @@ void updateApp(void *data) {
 
 int main() {
     SetTraceLogLevel(LOG_WARNING);
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-    SetConfigFlags(FLAG_MSAA_4X_HINT);
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_MAXIMIZED | FLAG_MSAA_4X_HINT);
     InitWindow(800, 600, "Sokoban");
 
     App app = createApp();
