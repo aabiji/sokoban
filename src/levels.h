@@ -1,37 +1,33 @@
 #ifndef LEVELS_H
 #define LEVELS_H
 
-#include <raymath.h>
 #include <stdbool.h>
 
 #define NUM_LEVELS 50
-
-typedef enum {
-    Floor,
-    Pusher,
-    Box,
-    Wall,
-    SplitWall,
-    Goal,
-    Corner,
-    ObjectEnumSize
-} Object;
+#define MAX_GOAL_INDEXES 100
 
 typedef struct {
-    Object obj;
-    bool isGoal; // Is this the tile where boxes should be put?
-} Tile;
+    enum { Empty, Border, Box } type;
+    bool isGoal; // Goal or floor?
+    struct {
+        float rotation;
+        bool isCorner;
+        bool isSplitWall;
+    } border;
+} Piece;
 
 typedef struct {
-    Vector2 size;
-    int numBytes;
-    Tile *tiles;
-    Tile *original;
+    int width;
+    int height;
+    int playerStartX;
+    int playerStartY;
+    int numGoals;
+    int goalIndexes[MAX_GOAL_INDEXES];
+    Piece* pieces;
+    Piece* original;
 } Level;
 
-// Parse all the levels from the file and return the number of levels parsed
-// NOTE: the file must end in a newline
-int parseLevels(char *source, Level *buffer, int bufferLength);
-void cleanupLevels(Level *levels, int amount);
+int parseLevels(char *source, Level levels[NUM_LEVELS]);
+bool levelCompleted(Level* level);
 
 #endif

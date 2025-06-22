@@ -40,10 +40,6 @@ const bool mouseInside(Rectangle r) {
            p.y <= r.y + r.height;
 }
 
-float easeInOutQuad(float t) {
-    return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-}
-
 // Draw a fullscreen overlay that gradually fades out over time
 void drawFadeAnimation(App *app) {
     // Setting fadeTime >= 0 triggers the animation
@@ -72,7 +68,7 @@ Color brightenColor(Color c, float amount) {
 }
 
 void drawMenu(App *app) {
-    centerText(app->game.font, "Sokoban",
+    centerText(app->game.assetManager.font, "Sokoban",
                (Vector2){(float)GetScreenWidth() / 2, 50}, 45, 0, WHITE);
 
     float cols = 10;
@@ -100,7 +96,7 @@ void drawMenu(App *app) {
                 c = brightenColor(c, 0.2);
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                     app->drawingMenu = false;
-                    changeLevel(&app->game, level);
+                    changeLevel(&app->game, level, false);
                     app->fadeTime = 0;
                     break;
                 }
@@ -110,7 +106,7 @@ void drawMenu(App *app) {
 
             const char *str = TextFormat("%d", level + 1);
             Vector2 p = {r.x + boxSize / 2, r.y + boxSize / 2};
-            centerText(app->game.font, str, p, 20, 0, WHITE);
+            centerText(app->game.assetManager.font, str, p, 20, 0, WHITE);
 
             pos.x += boxSize * 1.5;
         }
@@ -119,7 +115,7 @@ void drawMenu(App *app) {
     }
 
     Vector2 bottom = {(float)GetScreenWidth() / 2, GetScreenHeight() - 50};
-    centerText(app->game.font, "(C) 2025- @aabiji", bottom, 15, 0, WHITE);
+    centerText(app->game.assetManager.font, "(C) 2025- @aabiji", bottom, 15, 0, WHITE);
     drawFadeAnimation(app);
 
     if (hovering)
@@ -133,7 +129,7 @@ void drawGameInfo(App *app) {
 
     // Draw the sidebar of text
     Rectangle box =
-        centerText(app->game.font, "<", (Vector2){20, 25}, 50, 0, WHITE);
+        centerText(app->game.assetManager.font, "<", (Vector2){20, 25}, 50, 0, WHITE);
     if (mouseInside(box)) {
         SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
@@ -145,13 +141,13 @@ void drawGameInfo(App *app) {
     }
 
     const char *str = TextFormat("Level %d", app->game.level + 1);
-    DrawTextEx(app->game.font, str, (Vector2){45, 12}, 30, 0, c);
+    DrawTextEx(app->game.assetManager.font, str, (Vector2){45, 12}, 30, 0, c);
 
     const char *str1 = TextFormat("%d moves", app->game.player.numMoves);
-    DrawTextEx(app->game.font, str1, (Vector2){45, 52}, 30, 0, c);
+    DrawTextEx(app->game.assetManager.font, str1, (Vector2){45, 52}, 30, 0, c);
 
     const char *str2 = TextFormat("%d / %d", 10, 20);
-    DrawTextEx(app->game.font, str2, (Vector2){45, 92}, 30, 0, c);
+    DrawTextEx(app->game.assetManager.font, str2, (Vector2){45, 92}, 30, 0, c);
 }
 
 void gameloop(App *app) {
@@ -166,7 +162,7 @@ void gameloop(App *app) {
     if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S))
         levelSolved = movePlayer(&app->game, 0, 1);
     if (IsKeyPressed(KEY_R))
-        restartGame(&app->game);
+        restartLevel(&app->game);
 
     BeginMode3D(app->game.camera);
     drawLevel(&app->game);
@@ -177,7 +173,7 @@ void gameloop(App *app) {
     drawFadeAnimation(app);
 
     if (levelSolved) {
-        advanceLevel(&app->game);
+        changeLevel(&app->game, -1, true);
         app->fadeTime = 0;
     }
 }
