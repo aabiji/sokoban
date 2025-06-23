@@ -54,16 +54,6 @@ void centerTopdownCamera(Game *game) {
     game->camera.projection = CAMERA_PERSPECTIVE;
 }
 
-void initPlayer(Game* game, int x, int y) {
-    game->player.numMoves = 0;
-    game->player.position.t = -1;
-    game->player.position.vector.start = (Vector2){ x, y };
-    game->player.position.vector.end = (Vector2){ x, y };
-    game->player.rotation.t = -1;
-    game->player.rotation.scalar.start = 0;
-    game->player.rotation.scalar.end = 0;
-}
-
 void changeLevel(Game* game, int levelIndex, bool advance) {
     if (advance) levelIndex = game->level + 1;
     game->level = fmax(0, fmin(levelIndex, NUM_LEVELS - 1));
@@ -71,7 +61,10 @@ void changeLevel(Game* game, int levelIndex, bool advance) {
     centerTopdownCamera(game);
 
     Level* level = &game->levels[game->level];
-    initPlayer(game, level->playerStartX, level->playerStartY);
+    Vector2 pos = { level->playerStartX, level->playerStartY };
+    game->player.numMoves = 0;
+    game->player.position = createAnimation(pos, false, 0.1);
+    game->player.rotation = createAnimation((Vector2){ 0, 0 }, true, 0.1);
 }
 
 void restartLevel(Game* game) {
@@ -106,6 +99,7 @@ AssetType getAssetType(Piece p) {
 void drawLevel(Game *game) {
     Level level = game->levels[game->level];
 
+    // Draw the level tiles
     for (int y = 0; y < level.height; y++) {
         int first, last;
         getFirstAndLastWalls(&level, y, &first, &last);
@@ -127,14 +121,16 @@ void drawLevel(Game *game) {
             drawAsset(&game->assetManager, type, pos, angle);
         }
     }
-}
 
-void drawPlayer(Game *game) {
-    Vector2 position = interpolateVector(game->player.position);
-    float rotation = interpolateScalar(game->player.rotation);
-    drawAsset(&game->assetManager, Guy, position, rotation);
-    updateAnimation(&game->player.position, GetFrameTime(), 0.1);
-    updateAnimation(&game->player.rotation, GetFrameTime(), 0.1);
+    // Draw the player
+    drawAsset(
+        &game->assetManager,
+        Guy,
+        game->player.position.vector.value,
+        game->player.rotation.scalar.value
+    );
+    updateAnimation(&game->player.position, GetFrameTime());
+    updateAnimation(&game->player.rotation, GetFrameTime());
 }
 
 bool pushBoxes(Level* level, Vector2 next, int x, int y) {
@@ -169,12 +165,19 @@ bool pushBoxes(Level* level, Vector2 next, int x, int y) {
 }
 
 bool movePlayer(Game* game, int deltaX, int deltaY) {
-    if (deltaX == 1) startRotationAnimation(&game->player.rotation, 90);
-    if (deltaX == -1) startRotationAnimation(&game->player.rotation, 270);
-    if (deltaY == 1) startRotationAnimation(&game->player.rotation, 0);
-    if (deltaY == -1) startRotationAnimation(&game->player.rotation, 180);
+    if (game->player.rotation.active || game->player.position.active)
+        return false; // can't move while animation is being ran
 
-    Vector2 current = interpolateVector(game->player.position);
+    if (deltaX == 1)
+        startAnimation(&game->player.rotation, (Vector2){90, 0}, false);
+    if (deltaX == -1)
+        startAnimation(&game->player.rotation, (Vector2){270, 0}, false);
+    if (deltaY == 1)
+        startAnimation(&game->player.rotation, (Vector2){0, 0}, false);
+    if (deltaY == -1)
+        startAnimation(&game->player.rotation, (Vector2){180, 0}, false);
+
+    Vector2 current = game->player.position.vector.value;
     Vector2 next =
         (Vector2){round(current.x + deltaX), round(current.y + deltaY)};
 
@@ -189,7 +192,7 @@ bool movePlayer(Game* game, int deltaX, int deltaY) {
     }
 
     game->player.numMoves++;
-    startMovementAnimation(&game->player.position, next);
+    startAnimation(&game->player.position, next, false);
     return levelCompleted(&level);
 }
 

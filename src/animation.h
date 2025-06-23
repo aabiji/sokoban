@@ -3,51 +3,52 @@
 
 #include <math.h>
 
-static float smoothstep(float t) { return t * t * (3 - 2 * t); }
-
-static float easeInOutQuad(float t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
-
-static float lerp(float start, float end, float t) { return start + (end - start) * t; }
-
 typedef struct {
     float t;
-    union {
-        struct {
-            Vector2 start, end;
-        } vector;
-        struct {
-            float start, end;
-        } scalar;
-    };
+    bool isScalar;
+    bool active;
+    float duration;
+    struct { Vector2 start, end, value; } vector;
+    struct { float start, end, value; } scalar;
 } Animation;
 
-static Vector2 interpolateVector(Animation a) {
-    float t = smoothstep(a.t);
-    return (Vector2){
-        lerp(a.vector.start.x, a.vector.end.x, t),
-        lerp(a.vector.start.y, a.vector.end.y, t),
+static float lerp(float a, float b, float t) { return a + (b - a) * t; }
+
+static Animation createAnimation(Vector2 value, bool isScalar, float duration) {
+    return (Animation){
+        .t = 0, .isScalar = isScalar, .active = false, .duration = duration,
+        .vector = { .start = value, .end = value, .value = value },
+        .scalar = { .start = value.x, .end = value.x, .value = value.x },
     };
 }
 
-static float interpolateScalar(Animation a) {
-    return lerp(a.scalar.start, a.scalar.end, smoothstep(a.t));
-}
-
-static void updateAnimation(Animation* a, float deltaTime, float duration) {
-    if (a->t >= 0 && a->t < 1.0)
-        a->t += deltaTime / duration;
-}
-
-static void startRotationAnimation(Animation *a, float nextAngle) {
+static void startAnimation(Animation* a, Vector2 value, bool reset) {
     a->t = 0;
-    a->scalar.start = a->scalar.end;
-    a->scalar.end = nextAngle;
+    a->active = true;
+    if (a->isScalar) {
+        a->scalar.start = reset ? 0 : a->scalar.end;
+        a->scalar.end = value.x;
+    } else {
+        a->vector.start = reset ? (Vector2){ 0, 0 } : a->vector.end;
+        a->vector.end = value;
+    }
 }
 
-static void startMovementAnimation(Animation *a, Vector2 next) {
-    a->t = 0;
-    a->vector.start = a->vector.end;
-    a->vector.end = next;
+static void updateAnimation(Animation* a, float deltaTime) {
+    a->active = a->t < 1.0;
+    if (a->active) {
+        a->t = fmin(fmax(a->t + deltaTime / a->duration, 0), 1.0);
+        float smoothed = a->t * a->t * (3 - 2 * a->t); // smoothstep function
+
+        if (a->isScalar) {
+            a->scalar.value = lerp(a->scalar.start, a->scalar.end, smoothed);
+        } else {
+            a->vector.value = (Vector2){
+                lerp(a->vector.start.x, a->vector.end.x, smoothed),
+                lerp(a->vector.start.y, a->vector.end.y, smoothed),
+            };
+        }
+    }
 }
 
 #endif

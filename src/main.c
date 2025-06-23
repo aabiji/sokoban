@@ -8,12 +8,10 @@
 
 typedef struct {
     Game game;
-
+    Animation fade;
+    Color bg;
     bool drawingMenu;
     bool quit;
-    float fadeTime;
-
-    Color bg;
 } App;
 
 App createApp() {
@@ -21,7 +19,7 @@ App createApp() {
     app.game = createGame();
     app.quit = false;
     app.drawingMenu = true;
-    app.fadeTime = -1;
+    app.fade = createAnimation((Vector2){0, 0}, true, 0.5);
     return app;
 }
 
@@ -42,20 +40,13 @@ const bool mouseInside(Rectangle r) {
 
 // Draw a fullscreen overlay that gradually fades out over time
 void drawFadeAnimation(App *app) {
-    // Setting fadeTime >= 0 triggers the animation
-    if (app->fadeTime < 0)
-        return;
+    if (!app->fade.active) return;
 
-    float alpha = 255.0 - (255.0 * easeInOutQuad(app->fadeTime));
-
-    float duration = 0.5; // seconds
-    app->fadeTime += GetFrameTime() / duration;
+    updateAnimation(&app->fade, GetFrameTime());
+    float alpha = 255.0 - (255.0 * app->fade.scalar.value);
 
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(),
                   (Color){0, 0, 0, alpha});
-
-    if (app->fadeTime >= 1.0)
-        app->fadeTime = -1; // stop the animation
 }
 
 Color brightenColor(Color c, float amount) {
@@ -97,7 +88,7 @@ void drawMenu(App *app) {
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                     app->drawingMenu = false;
                     changeLevel(&app->game, level, false);
-                    app->fadeTime = 0;
+                    startAnimation(&app->fade, (Vector2){ 1, 1 }, true);
                     break;
                 }
             }
@@ -134,7 +125,7 @@ void drawGameInfo(App *app) {
         SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
             app->drawingMenu = true;
-            app->fadeTime = 0;
+            startAnimation(&app->fade, (Vector2){1, 1}, true);
         }
     } else {
         SetMouseCursor(MOUSE_CURSOR_DEFAULT);
@@ -166,7 +157,6 @@ void gameloop(App *app) {
 
     BeginMode3D(app->game.camera);
     drawLevel(&app->game);
-    drawPlayer(&app->game);
     EndMode3D();
 
     drawGameInfo(app);
@@ -174,7 +164,7 @@ void gameloop(App *app) {
 
     if (levelSolved) {
         changeLevel(&app->game, -1, true);
-        app->fadeTime = 0;
+        startAnimation(&app->fade, (Vector2){1, 1}, true);
     }
 }
 
@@ -198,17 +188,29 @@ void updateApp(void *data) {
     EndDrawing();
 }
 
-// TODO: fix the player rotation animation (looks choppy when turning sometimes)
-//	 apply animations to the boxes
-//	 refactor out the animation logic and player logic from game.c
-//	 improve wall rendering
-//	 why are there lines when drawing certain levels?
-//	 polish (different hover animations, etc)
-//	 sound effects and a chill soundtrack
-// 	 add basic lighting
-// 	 nicer level selection screen
-// 	 port to web and mobile
-// 	 release
+/*
+TODO:
+- Improve the animation system
+  The player should do a little bounce then turn animation when rotating
+  The player should slide when moving
+  Boxes should slide when moving
+- Use these https://sona-sar.itch.io/voxel-animals-items-pack-free-assets
+  assets instead
+  Use trees as borders instead of walls
+- Add some basic phong lighting
+  change the camera perspective to be more isometric without hurting the
+  view the player has on the board
+- Find a royalty free, chill, fun and calming soundtrack
+  Also find sound effects for clicking buttons, moving the player,
+  pushing boxes and finishing a level
+- Add nicer transitions. Instead of just a fade in, add text for what
+  screen you're transitioning to and have a more developped background animation
+- Add more puzzles
+  Improve the level selection screen
+- Add a help screen
+- Use Emscripten to port to web
+- Release on hackernews (June 27)
+*/
 
 int main() {
     SetTraceLogLevel(LOG_WARNING);

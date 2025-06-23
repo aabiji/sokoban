@@ -31,7 +31,6 @@ void drawLevel(Game *game);
 void changeLevel(Game *game, int levelIndex, bool advance);
 void restartLevel(Game *game);
 
-void drawPlayer(Game *game);
 int savePlayerData(Game *game);
 bool movePlayer(Game *game, int deltaX, int deltaY); // returns true if level is done
 
