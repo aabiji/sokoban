@@ -50,7 +50,7 @@ Piece getPiece(Line* lines, int width, int height, int x, int y) {
     }
     if (c == '$' || c == '*') {
         p = (Piece){ Box, c == '*' };
-        p.boxSlide = createAnimation((Vector2){ x, y }, false, 0.5);
+        p.boxSlide = createAnimation((Vector2){x, y}, false, PLAYER_SPEED);
     }
     if (c == '.') p = (Piece){ Empty, true };
     return p;
@@ -112,9 +112,15 @@ int parseLevels(char* filePath, Level* levels) {
         }
     }
 
+    // parse the last level
+    levels[i++] = parseLevel(lines, width, height);
+    for (int y = 0; y < height; y++) {
+        free(lines[y].str);
+    }
+
     free(line);
     fclose(file);
-    return i + 1 != NUM_LEVELS ? -1 : 0;
+    return i != NUM_LEVELS ? -1 : 0;
 }
 
 // return true if all the goal positions are covered by a box

@@ -21,6 +21,9 @@ typedef struct {
 
     int level;
     Level levels[NUM_LEVELS];
+
+    int numMoves;
+    int boxMoves[25];
 } Game;
 
 Game createGame();

@@ -19,7 +19,7 @@ App createApp() {
     app.game = createGame();
     app.quit = false;
     app.drawingMenu = true;
-    app.fade = createAnimation((Vector2){0, 0}, true, 0.5);
+    app.fade = createAnimation((Vector2){0, 0}, true, TRANSISTION_SPEED);
     return app;
 }
 

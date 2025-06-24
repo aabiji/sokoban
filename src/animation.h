@@ -3,6 +3,10 @@
 
 #include <math.h>
 
+// all in seconds
+#define PLAYER_SPEED 0.1
+#define TRANSISTION_SPEED 0.5
+
 typedef struct {
     float t;
     bool isScalar;
