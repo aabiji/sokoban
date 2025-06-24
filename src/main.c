@@ -192,8 +192,6 @@ void updateApp(void *data) {
 TODO:
 - Improve the animation system
   The player should do a little bounce then turn animation when rotating
-  The player should slide when moving
-  Boxes should slide when moving
 - Use these https://sona-sar.itch.io/voxel-animals-items-pack-free-assets
   assets instead
   Use trees as borders instead of walls

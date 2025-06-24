@@ -30,24 +30,18 @@ AssetManager loadAssets() {
 
     am.font = LoadFont("assets/fonts/Grobold.ttf");
 
-    am.assets[Crate] = loadAsset("assets/models/box.obj", am.tileSize);
-    am.assets[Wall] = loadAsset("assets/models/wall.gltf", am.tileSize);
-    am.assets[SplitWall] =
-        loadAsset("assets/models/split_wall.gltf", am.tileSize);
-    am.assets[Corner] =
-        loadAsset("assets/models/corner.gltf", am.tileSize);
-    am.assets[Guy] = loadAsset("assets/models/player.obj", am.playerScale);
-    am.assets[Floor] = loadAsset("assets/models/floor.obj", am.tileSize);
-    am.assets[Goal] = loadAsset("assets/models/goal.obj", am.tileSize);
-
-    am.textures[0] = LoadTexture("assets/models/texture1.png");
-    am.textures[1] = LoadTexture("assets/models/texture2.png");
-    am.textures[2] = LoadTexture("assets/models/texture3.png");
+    char* paths[] = {
+        "assets/Main/Green/tree1/tree.vox",
+        "assets/Main/Green/grass1/grass1.vox",
+        "assets/Main/Green/walktile/walktile.vox",
+        "assets/Main/Green/box1/box1.vox",
+        "assets/Animals/Bunny/bunny.vox"
+    };
 
     for (int i = 0; i < NumAssets; i++) {
-        Model m = am.assets[i].model;
-        int t = i == Floor || i == Goal || i == Guy ? 2 : 1;
-        m.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = am.textures[t];
+        Vector3 size = i == Guy ? am.playerScale : am.tileSize;
+        am.assets[i] = loadAsset(TextFormat("%s.obj", paths[i]), size);
+        am.textures[i] = LoadTexture(TextFormat("%s.png", paths[i]));
     }
 
     return am;
@@ -67,8 +61,6 @@ void cleanupAssets(AssetManager* am) {
     UnloadFont(am->font);
     for (int i = 0; i < NumAssets; i++) {
         UnloadModel(am->assets[i].model);
-    }
-    for (int i = 0; i < 3; i++) {
         UnloadTexture(am->textures[i]);
     }
 }

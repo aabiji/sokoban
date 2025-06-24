@@ -88,11 +88,7 @@ void getFirstAndLastWalls(Level* level, int row, int *first, int *last) {
 }
 
 AssetType getAssetType(Piece p) {
-    if (p.type == Border) {
-        if (p.border.isCorner) return Corner;
-        if (p.border.isSplitWall) return SplitWall;
-        return Wall;
-    }
+    if (p.type == Border) return Wall;
     if (p.type == Box) return Crate;
     return p.isGoal ? Goal : Floor;
 }
@@ -146,7 +142,6 @@ void drawLevel(Game* game) {
 
             Piece p = level.pieces[y * level.width + x];
             AssetType type = getAssetType(p);
-            float angle = p.type == Border ? p.border.rotation : 0;
             Vector2 pos = { x, y };
             Vector2 realPos = p.type == Box ? p.boxSlide.vector.value : pos;
 
@@ -155,7 +150,7 @@ void drawLevel(Game* game) {
                 AssetType t = p.isGoal ? Goal : Floor;
                 drawAsset(&game->assetManager, t, pos, 0);
             }
-            drawAsset(&game->assetManager, type, realPos, angle);
+            drawAsset(&game->assetManager, type, realPos, 0);
         }
     }
 

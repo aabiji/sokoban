@@ -4,9 +4,7 @@
 #include <raylib.h>
 
 typedef enum {
-    Wall, SplitWall, Corner,
-    Floor, Goal, Crate, Guy,
-    NumAssets,
+    Wall, Floor, Goal, Crate, Guy, NumAssets,
 } AssetType;
 
 typedef struct {
@@ -16,7 +14,7 @@ typedef struct {
 
 typedef struct {
     Font font;
-    Texture textures[3];
+    Texture textures[NumAssets];
     Asset assets[NumAssets];
 
     Vector3 tileSize;

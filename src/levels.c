@@ -8,51 +8,17 @@
 
 typedef struct { int length; char* str; } Line;
 
-bool isNotBorder(Line* lines, int width, int height, int x, int y) {
-    bool xOutside = x < 0 || x + 1 >= lines[y].length;
-    bool yOutside = y < 0 || y + 1 > height;
-    return xOutside || yOutside || lines[y].str[x] != '#';
-}
-
-void setBorder(Piece* p, bool c, bool s, int r) {
-    p->border.isCorner = c;
-    p->border.isSplitWall = s;
-    p->border.rotation = r;
-}
-
-void getBorderOrientation(Piece* p, Line* lines, int width, int height, int x, int y) {
-    bool l = isNotBorder(lines, width, height, x - 1, y);
-    bool r = isNotBorder(lines, width, height, x + 1, y);
-    bool t = isNotBorder(lines, width, height, x, y - 1);
-    bool b = isNotBorder(lines, width, height, x, y + 1);
-
-    if (!l && r && t && !b) setBorder(p, true, false, 0); // top right corner
-    else if (l && !r && t && !b) setBorder(p, true, false, 90); // top left corner
-    else if (l && !r && b && !t) setBorder(p, true, false, 180); // bottom left corner
-    else if (!l && r && b && !t) setBorder(p, true, false, 270); // bottom right corner
-
-    else if (!l && !r && !t && b) setBorder(p, false, true, 180); // upwards split wall
-    else if (!l && !r && t && !b) setBorder(p, false, true, 0); // downwards split wall
-    else if (l && !r && !t && !b) setBorder(p, false, true, 90); // right split wall
-    else if (!l && r && !t && !b) setBorder(p, false, true, 270); // left split wall
-
-    else setBorder(p, false, false, l && r ? 90 : 0); // vertical wall/horizontal wall
-}
-
 Piece getPiece(Line* lines, int width, int height, int x, int y) {
     Piece p = { Empty, false };
     if (x >= lines[y].length) return p;
     char c = lines[y].str[x];
 
-    if (c == '#') {
-        p = (Piece){ Border, false };
-        getBorderOrientation(&p, lines, width, height, x, y);
-    }
     if (c == '$' || c == '*') {
         p = (Piece){ Box, c == '*' };
         p.boxSlide = createAnimation((Vector2){x, y}, false, PLAYER_SPEED);
     }
     if (c == '.') p = (Piece){ Empty, true };
+    if (c == '#') p = (Piece){ Border, false };
     return p;
 }
 

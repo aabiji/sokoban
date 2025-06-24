@@ -11,11 +11,6 @@
 typedef struct {
     enum { Empty, Border, Box } type;
     bool isGoal; // Goal or floor?
-    struct {
-        float rotation;
-        bool isCorner;
-        bool isSplitWall;
-    } border;
     Animation boxSlide;
 } Piece;
 
