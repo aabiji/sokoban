@@ -1,4 +1,3 @@
-#include <math.h>
 #include <raymath.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -87,16 +86,4 @@ int parseLevels(char* filePath, Level* levels) {
     free(line);
     fclose(file);
     return i != NUM_LEVELS ? -1 : 0;
-}
-
-// return true if all the goal positions are covered by a box
-bool levelCompleted(Level* level) {
-    for (int i = 0; i < level->numGoals; i++) {
-        int pos = level->goalIndexes[i];
-        Piece p = level->pieces[pos];
-        if (p.isGoal && p.type != Box) {
-            return false;
-        }
-    }
-    return true;
 }

@@ -9,6 +9,7 @@ typedef enum {
 
 typedef struct {
     Model model;
+    Vector3 size;
     Vector3 scaleFactor;
 } Asset;
 
@@ -16,13 +17,14 @@ typedef struct {
     Font font;
     Texture textures[NumAssets];
     Asset assets[NumAssets];
-
     Vector3 tileSize;
-    Vector3 playerScale;
 } AssetManager;
 
 AssetManager loadAssets();
-void drawAsset(AssetManager* am, AssetType type, Vector2 position, float rotation);
+void drawAsset(
+    AssetManager* am, AssetType type, Vector3 offset,
+    Vector2 position, float rotation, bool offsetHeight
+);
 void cleanupAssets(AssetManager* am);
 
 #endif

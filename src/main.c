@@ -9,7 +9,6 @@
 typedef struct {
     Game game;
     Animation fade;
-    Color bg;
     bool drawingMenu;
     bool quit;
 } App;
@@ -24,7 +23,7 @@ App createApp() {
 }
 
 // Draw text centered at a point and return its bounding box
-Rectangle centerText(Font font, const char *text, Vector2 point, int fontSize,
+Rectangle centerText(Font font, const char* text, Vector2 point, int fontSize,
                      int spacing, Color color) {
     Vector2 size = MeasureTextEx(font, text, fontSize, spacing);
     Vector2 p = {point.x - size.x / 2, point.y - size.y / 2};
@@ -39,7 +38,7 @@ const bool mouseInside(Rectangle r) {
 }
 
 // Draw a fullscreen overlay that gradually fades out over time
-void drawFadeAnimation(App *app) {
+void drawFadeAnimation(App* app) {
     if (!app->fade.active) return;
 
     updateAnimation(&app->fade, GetFrameTime());
@@ -58,7 +57,7 @@ Color brightenColor(Color c, float amount) {
     return new;
 }
 
-void drawMenu(App *app) {
+void drawMenu(App* app) {
     centerText(app->game.assetManager.font, "Sokoban",
                (Vector2){(float)GetScreenWidth() / 2, 50}, 45, 0, WHITE);
 
@@ -95,7 +94,7 @@ void drawMenu(App *app) {
 
             DrawRectangleRounded(r, 0.2, 0, c);
 
-            const char *str = TextFormat("%d", level + 1);
+            const char* str = TextFormat("%d", level + 1);
             Vector2 p = {r.x + boxSize / 2, r.y + boxSize / 2};
             centerText(app->game.assetManager.font, str, p, 20, 0, WHITE);
 
@@ -115,7 +114,7 @@ void drawMenu(App *app) {
         SetMouseCursor(MOUSE_CURSOR_DEFAULT);
 }
 
-void drawGameInfo(App *app) {
+void drawGameInfo(App* app) {
     Color c = (Color){210, 125, 45, 255};
 
     // Draw the sidebar of text
@@ -131,29 +130,28 @@ void drawGameInfo(App *app) {
         SetMouseCursor(MOUSE_CURSOR_DEFAULT);
     }
 
-    const char *str = TextFormat("Level %d", app->game.level + 1);
+    const char* str = TextFormat("Level %d", app->game.level + 1);
     DrawTextEx(app->game.assetManager.font, str, (Vector2){45, 12}, 30, 0, c);
 
-    const char *str1 = TextFormat("%d moves", app->game.player.numMoves);
+    const char* str1 = TextFormat("%d moves", app->game.player.numMoves);
     DrawTextEx(app->game.assetManager.font, str1, (Vector2){45, 52}, 30, 0, c);
 
-    const char *str2 = TextFormat("%d / %d", 10, 20);
+    const char* str2 = TextFormat("%d / %d", 10, 20);
     DrawTextEx(app->game.assetManager.font, str2, (Vector2){45, 92}, 30, 0, c);
 }
 
-void gameloop(App *app) {
-    bool levelSolved = false;
+void gameloop(App* app) {
+    if (levelSolved(&app->game)) {
+        changeLevel(&app->game, -1, true);
+        startAnimation(&app->fade, (Vector2){1, 1}, true);
+        return;
+    }
 
-    if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_A))
-        levelSolved = movePlayer(&app->game, 1, 0);
-    if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_D))
-        levelSolved = movePlayer(&app->game, -1, 0);
-    if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W))
-        levelSolved = movePlayer(&app->game, 0, -1);
-    if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S))
-        levelSolved = movePlayer(&app->game, 0, 1);
-    if (IsKeyPressed(KEY_R))
-        restartLevel(&app->game);
+    if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_A)) movePlayer(&app->game, 1, 0);
+    if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_D)) movePlayer(&app->game, -1, 0);
+    if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) movePlayer(&app->game, 0, -1);
+    if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) movePlayer(&app->game, 0, 1);
+    if (IsKeyPressed(KEY_R)) restartLevel(&app->game);
 
     BeginMode3D(app->game.camera);
     drawLevel(&app->game);
@@ -161,15 +159,10 @@ void gameloop(App *app) {
 
     drawGameInfo(app);
     drawFadeAnimation(app);
-
-    if (levelSolved) {
-        changeLevel(&app->game, -1, true);
-        startAnimation(&app->fade, (Vector2){1, 1}, true);
-    }
 }
 
-void updateApp(void *data) {
-    App *app = (App *)data;
+void updateApp(void* data) {
+    App* app = (App*)data;
 
     if (WindowShouldClose()) {
         savePlayerData(&app->game);
@@ -178,7 +171,7 @@ void updateApp(void *data) {
     }
 
     BeginDrawing();
-    ClearBackground((Color){135, 206, 235, 234});
+    ClearBackground((Color){100, 177, 213, 255});
 
     if (app->drawingMenu)
         drawMenu(app);
@@ -192,9 +185,6 @@ void updateApp(void *data) {
 TODO:
 - Improve the animation system
   The player should do a little bounce then turn animation when rotating
-- Add some basic phong lighting
-  change the camera perspective to be more isometric without hurting the
-  view the player has on the board
 - Find a royalty free, chill, fun and calming soundtrack
   Also find sound effects for clicking buttons, moving the player,
   pushing boxes and finishing a level

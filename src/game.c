@@ -1,4 +1,3 @@
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,7 +25,7 @@ Game createGame() {
         exit(-1);
     }
 
-    game.assetManager = loadAssets(&game.assetManager);
+    game.assetManager = loadAssets();
     return game;
 }
 
@@ -38,28 +37,38 @@ void cleanupGame(Game* game) {
     }
 }
 
-void centerTopdownCamera(Game* game) {
-    // setup the camera
+void orientCamera(Game* game) {
     float w = game->levels[game->level].width * game->assetManager.tileSize.x;
     float h = game->levels[game->level].height * game->assetManager.tileSize.y;
     Vector3 center = {w / 2.0, 0, h / 2.0};
 
-    // How high the camera needs to be to be able to fully see the longest side
+    // Camera distance needed to be to be able to fully see the longest side
     float longerSide = fmax(w, h);
-    float cameraHeight = (longerSide / 2.0) / tanf((45 * DEG2RAD) / 2.0);
+    float distance = (longerSide / 2.0) / tanf((45 * DEG2RAD) / 2.0);
+
+    // coordinates necessary to tilt the camera back (tilting the content forwards)
+    float tilt = -25.0 * DEG2RAD;
+    float y = distance * cosf(tilt);
+    float z = distance * sinf(tilt);
 
     game->camera.fovy = 45;
     game->camera.target = center;
-    game->camera.position = (Vector3){center.x, cameraHeight, center.z};
-    game->camera.up = (Vector3){0.0f, 0.0f, -1.0f};
+    game->camera.position = (Vector3){ center.x, y, center.z - z };
+    game->camera.up = (Vector3){ 0.0f, 0.0f, -1.0f };
     game->camera.projection = CAMERA_PERSPECTIVE;
+
+    // to ensure the level is centered on screen
+    game->drawOffset = (Vector3){
+        game->assetManager.tileSize.x, 0.0,
+        game->assetManager.tileSize.z / 2.0
+    };
 }
 
 void changeLevel(Game* game, int levelIndex, bool advance) {
     if (advance) levelIndex = game->level + 1;
     game->level = fmax(0, fmin(levelIndex, NUM_LEVELS - 1));
 
-    centerTopdownCamera(game);
+    orientCamera(game);
 
     Level* level = &game->levels[game->level];
     Vector2 pos = { level->playerStartX, level->playerStartY };
@@ -75,7 +84,20 @@ void restartLevel(Game* game) {
     changeLevel(game, game->level, false);
 }
 
-void getFirstAndLastWalls(Level* level, int row, int *first, int *last) {
+// return true if all the goal positions are covered by a box
+bool levelSolved(Game* game) {
+    Level* level = &game->levels[game->level];
+    for (int i = 0; i < level->numGoals; i++) {
+        int pos = level->goalIndexes[i];
+        Piece p = level->pieces[pos];
+        if (p.isGoal && p.type != Box) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void getFirstAndLastWalls(Level* level, int row, int* first, int* last) {
     *first = level->width;
     *last = 0;
     for (int i = 0; i < level->width; i++) {
@@ -148,9 +170,14 @@ void drawLevel(Game* game) {
             // Draw the floor beneath
             if (p.type != Empty) {
                 AssetType t = p.isGoal ? Goal : Floor;
-                drawAsset(&game->assetManager, t, pos, 0);
+                drawAsset(&game->assetManager, t, game->drawOffset, pos, 0, false);
             }
-            drawAsset(&game->assetManager, type, realPos, 0);
+
+            // Wall, Floor, Goal, Crate, Guy, NumAssets,
+            Vector3 offset = game->drawOffset;
+            if (p.type == Border) offset.y = 1.0;
+            else if (p.type != Empty) offset.y = 0.5;
+            drawAsset(&game->assetManager, type, offset, realPos, 0, p.type != Empty);
         }
     }
 
@@ -158,8 +185,10 @@ void drawLevel(Game* game) {
     drawAsset(
         &game->assetManager,
         Guy,
+        game->drawOffset,
         game->player.position.vector.value,
-        game->player.rotation.scalar.value
+        game->player.rotation.scalar.value,
+        true
     );
     updateAnimation(&game->player.position, GetFrameTime());
     updateAnimation(&game->player.rotation, GetFrameTime());
@@ -198,11 +227,10 @@ bool pushBoxes(Game* game, Vector2 next, int x, int y) {
     return true;
 }
 
-bool movePlayer(Game* game, int deltaX, int deltaY) {
+void movePlayer(Game* game, int deltaX, int deltaY) {
     // lock the player until animations are done running
     if (game->player.rotation.active || game->player.position.active ||
-        game->numMoves > 0)
-        return false;
+        game->numMoves > 0) return;
 
     if (deltaX == 1)
         startAnimation(&game->player.rotation, (Vector2){90, 0}, false);
@@ -219,20 +247,18 @@ bool movePlayer(Game* game, int deltaX, int deltaY) {
 
     Level level = game->levels[game->level];
     int index = next.y * level.width + next.x;
-    if (level.pieces[index].type == Border)
-        return false;
+    if (level.pieces[index].type == Border) return;
 
     if (level.pieces[index].type == Box) {
         bool canPushBoxes = pushBoxes(game, next, deltaX, deltaY);
-        if (!canPushBoxes) return false;
+        if (!canPushBoxes) return;
     }
 
     game->player.numMoves++;
     startAnimation(&game->player.position, next, false);
-    return levelCompleted(&level);
 }
 
-int savePlayerData(Game *game) {
+int savePlayerData(Game* game) {
     FILE *fp = fopen(game->saveFile, "wb");
     if (fp == NULL)
         return -1;

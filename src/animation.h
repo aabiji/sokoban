@@ -1,7 +1,8 @@
 #ifndef ANIMATION_H
 #define ANIMATION_H
 
-#include <math.h>
+#include <raymath.h>
+#include <stdbool.h>
 
 // all in seconds
 #define PLAYER_SPEED 0.1

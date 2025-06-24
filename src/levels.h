@@ -1,7 +1,6 @@
 #ifndef LEVELS_H
 #define LEVELS_H
 
-#include <stdbool.h>
 #include "animation.h"
 
 #define NUM_LEVELS 50
@@ -26,6 +25,5 @@ typedef struct {
 } Level;
 
 int parseLevels(char* filePath, Level* levels);
-bool levelCompleted(Level* level);
 
 #endif
