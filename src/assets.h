@@ -20,7 +20,7 @@ typedef struct {
     Vector3 tileSize;
 } AssetManager;
 
-AssetManager loadAssets();
+AssetManager loadAssets(Shader shader);
 void drawAsset(
     AssetManager* am, AssetType type, Vector3 offset,
     Vector2 position, float rotation, bool offsetHeight

@@ -4,6 +4,9 @@
 #include "assets.h"
 #include "levels.h"
 
+#define RLIGHTS_IMPLEMENTATION
+#include "rlights.h"
+
 typedef struct {
     Animation position;
     Animation rotation;
@@ -15,6 +18,9 @@ typedef struct {
 typedef struct {
     AssetManager assetManager;
     Camera3D camera;
+
+    Shader shader;
+    Light lights[3];
 
     Player player;
     const char* saveFile;
@@ -29,6 +35,7 @@ typedef struct {
 
 Game createGame();
 void cleanupGame(Game* game);
+void updateLighting(Game* game);
 
 void drawLevel(Game* game);
 void changeLevel(Game* game, int levelIndex, bool advance);

@@ -5,6 +5,52 @@
 #include "game.h"
 #include "levels.h"
 
+#if defined(PLATFORM_DESKTOP)
+    #define GLSL_VERSION 330
+#else // web, android
+    #define GLSL_VERSION 100
+#endif
+
+void setupShader(Game* game) {
+    const char* vsShader = TextFormat("assets/shaders/glsl%d/lighting.vs", GLSL_VERSION);
+    const char* fsShader = TextFormat("assets/shaders/glsl%d/lighting.fs", GLSL_VERSION);
+
+    Shader shader = LoadShader(vsShader, fsShader);
+    shader.locs[SHADER_LOC_VECTOR_VIEW] = GetShaderLocation(shader, "viewPos");
+
+    int ambientLoc = GetShaderLocation(shader, "ambient");
+    SetShaderValue(shader, ambientLoc, (float[4]){ 0.9, 0.9, 0.9, 1.0 }, SHADER_UNIFORM_VEC4);
+
+    //top-down directional
+    game->lights[0] = CreateLight(
+        LIGHT_DIRECTIONAL,
+        (Vector3){ -0.2, 1.0, 0.2 }, // straight down from above
+        Vector3Zero(),
+        (Color){ 85, 85, 95, 255 },
+        shader
+    );
+
+    // left side illumination
+    CreateLight(
+        LIGHT_DIRECTIONAL,
+        (Vector3){ 0.5, 0.3, 0.5 }, // angled from the left side and slightly above
+        Vector3Zero(),
+        (Color){ 95, 95, 105, 255},
+        shader
+    );
+
+    // right side illumination
+    CreateLight(
+        LIGHT_DIRECTIONAL,
+        (Vector3){ -0.3, 0.3, 0.5 }, // less aggressive angle from the right
+        Vector3Zero(),
+        (Color){ 95, 95, 95, 255 },
+        shader
+    );
+
+    game->shader = shader;
+}
+
 Game createGame() {
     Game game = { .numMoves = 0 };
 
@@ -17,7 +63,6 @@ Game createGame() {
     }
     fread(&game.player, sizeof(Player), 1, fp);
 
-
     // Load the levels
     int value = parseLevels("assets/levels.txt", game.levels);
     if (value == -1) { // TODO: tell user!
@@ -25,7 +70,8 @@ Game createGame() {
         exit(-1);
     }
 
-    game.assetManager = loadAssets();
+    setupShader(&game);
+    game.assetManager = loadAssets(game.shader);
     return game;
 }
 
@@ -192,6 +238,22 @@ void drawLevel(Game* game) {
     );
     updateAnimation(&game->player.position, GetFrameTime());
     updateAnimation(&game->player.rotation, GetFrameTime());
+}
+
+void updateLighting(Game* game) {
+    float cameraPos[3] = {
+        game->camera.position.x,
+        game->camera.position.y,
+        game->camera.position.z
+    };
+
+    SetShaderValue(game->shader,
+        game->shader.locs[SHADER_LOC_VECTOR_VIEW],
+        cameraPos, SHADER_UNIFORM_VEC3);
+
+    for (int i = 0; i < 3; i++) {
+        UpdateLightValues(game->shader, game->lights[i]);
+    }
 }
 
 bool pushBoxes(Game* game, Vector2 next, int x, int y) {

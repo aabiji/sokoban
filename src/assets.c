@@ -1,9 +1,20 @@
 #include <math.h>
+#include <string.h>
 #include "assets.h"
 
-Asset loadAsset(const char *path, Vector3 targetSize) {
+Asset loadAsset(
+    Shader shader, Texture2D texture,
+    Vector3 targetSize, const char *path
+) {
     Asset asset;
     asset.model = LoadModel(path);
+
+    asset.model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture;
+    asset.model.materials[0].shader = shader;
+
+    Mesh mesh = asset.model.meshes[0];
+    if (mesh.normals == NULL)
+        GenMeshTangents(&mesh);
 
     BoundingBox bounds = GetMeshBoundingBox(asset.model.meshes[0]);
     asset.size = (Vector3){
@@ -23,7 +34,7 @@ Asset loadAsset(const char *path, Vector3 targetSize) {
     return asset;
 }
 
-AssetManager loadAssets() {
+AssetManager loadAssets(Shader shader) {
     AssetManager am = {
         .tileSize = (Vector3){2.5, 2.5, 2.5},
         .font = LoadFont("assets/fonts/Grobold.ttf")
@@ -34,11 +45,12 @@ AssetManager loadAssets() {
         "assets/Main/Green/grass1/grass1.vox",
         "assets/Main/Green/nograss/nograss.vox",
         "assets/Main/Green/box1/box1.vox",
-        "assets/Animals/Bunny/bunny.vox"
+        "assets/Animals/Piglet/piglet.vox"
     };
     for (int i = 0; i < NumAssets; i++) {
-        am.assets[i] = loadAsset(TextFormat("%s.obj", paths[i]), am.tileSize);
         am.textures[i] = LoadTexture(TextFormat("%s.png", paths[i]));
+        const char* path = TextFormat("%s.obj", paths[i]);
+        am.assets[i] = loadAsset(shader, am.textures[i], am.tileSize, path);
     }
 
     return am;

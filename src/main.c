@@ -1,6 +1,5 @@
 #include "game.h"
 #include "levels.h"
-#include "raylib.h"
 
 #if defined(PLATFORM_WEB)
     #include <emscripten/emscripten.h>
@@ -16,10 +15,15 @@ typedef struct {
 App createApp() {
     App app;
     app.game = createGame();
+    app.fade = createAnimation((Vector2){0, 0}, true, TRANSISTION_SPEED);
     app.quit = false;
     app.drawingMenu = true;
-    app.fade = createAnimation((Vector2){0, 0}, true, TRANSISTION_SPEED);
     return app;
+}
+
+void cleanupApp(App* app) {
+    cleanupGame(&app->game);
+    UnloadShader(app->game.shader);
 }
 
 // Draw text centered at a point and return its bounding box
@@ -154,7 +158,10 @@ void gameloop(App* app) {
     if (IsKeyPressed(KEY_R)) restartLevel(&app->game);
 
     BeginMode3D(app->game.camera);
+    BeginShaderMode(app->game.shader);
+    updateLighting(&app->game);
     drawLevel(&app->game);
+    EndShaderMode();
     EndMode3D();
 
     drawGameInfo(app);
@@ -171,7 +178,7 @@ void updateApp(void* data) {
     }
 
     BeginDrawing();
-    ClearBackground((Color){100, 177, 213, 255});
+    ClearBackground((Color){135, 206, 250, 255});
 
     if (app->drawingMenu)
         drawMenu(app);
@@ -183,8 +190,8 @@ void updateApp(void* data) {
 
 /*
 TODO:
-- Improve the animation system
-  The player should do a little bounce then turn animation when rotating
+- Improve the lighting
+  It looks really flat and really bland. fix that. Add shadows? Change light colors?
 - Find a royalty free, chill, fun and calming soundtrack
   Also find sound effects for clicking buttons, moving the player,
   pushing boxes and finishing a level
@@ -212,6 +219,6 @@ int main() {
         updateApp(&app);
 #endif
 
-    cleanupGame(&app.game);
+    cleanupApp(&app);
     CloseWindow();
 }
