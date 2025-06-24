@@ -2,7 +2,6 @@
 #define GAME_H
 
 #include "assets.h"
-#include "animation.h"
 #include "levels.h"
 
 typedef struct {

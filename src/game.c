@@ -29,7 +29,7 @@ Game createGame() {
     return game;
 }
 
-void cleanupGame(Game *game) {
+void cleanupGame(Game* game) {
     cleanupAssets(&game->assetManager);
     for (int i = 0; i < NUM_LEVELS; i++) {
         free(game->levels[i].pieces);
@@ -37,7 +37,7 @@ void cleanupGame(Game *game) {
     }
 }
 
-void centerTopdownCamera(Game *game) {
+void centerTopdownCamera(Game* game) {
     // setup the camera
     float w = game->levels[game->level].width * game->assetManager.tileSize.x;
     float h = game->levels[game->level].height * game->assetManager.tileSize.y;
@@ -96,7 +96,54 @@ AssetType getAssetType(Piece p) {
     return p.isGoal ? Goal : Floor;
 }
 
-void drawLevel(Game *game) {
+typedef struct {
+    Vector2 current;
+    Vector2 target;
+} BoxMove;
+
+// TODO: this is a shitty implementation, that still buggy
+//       when we try to move a move that's currently animating, it breaks
+//       completely rewrite this
+void updateBoxAnimation(Game* game) {
+    Level level = game->levels[game->level];
+
+    BoxMove moves[100];
+    int numMoves = 0;
+
+    // first pass, update the box animations
+    for (int y = 0; y < level.height; y++) {
+        for (int x = 0; x < level.width; x++) {
+            int index = y * level.width + x;
+            Piece p = level.pieces[index];
+            if (p.type != Box || !p.boxSlide.active) continue;
+
+            updateAnimation(&level.pieces[index].boxSlide, GetFrameTime());
+
+            // Record a box move when it's finished its animation
+            if (!level.pieces[index].boxSlide.active) {
+                Vector2 pos = level.pieces[index].boxSlide.vector.value;
+                moves[numMoves++] = (BoxMove){ .current = { x, y }, .target = pos };
+            }
+        }
+    }
+
+    // second pass, move the boxes that are done with their animation
+    for (int i = numMoves - 1; i >= 0; i--) {
+        BoxMove m = moves[i];
+
+        int targetIndex = m.target.y * level.width + m.target.x;
+        level.pieces[targetIndex].type = Box;
+        level.pieces[targetIndex].boxSlide = createAnimation(m.target, false, 0.5);
+
+        int currentIndex = m.current.y * level.width + m.current.x;
+        level.pieces[currentIndex].type = Empty;
+        level.pieces[currentIndex].boxSlide = createAnimation(m.current, false, 0.5);
+    }
+}
+
+void drawLevel(Game* game) {
+    updateBoxAnimation(game);
+
     Level level = game->levels[game->level];
 
     // Draw the level tiles
@@ -109,9 +156,8 @@ void drawLevel(Game *game) {
 
             Piece p = level.pieces[y * level.width + x];
             AssetType type = getAssetType(p);
-
-            Vector2 pos = { x, y };
             float angle = p.type == Border ? p.border.rotation : 0;
+            Vector2 pos = p.type == Box ? p.boxSlide.vector.value : (Vector2){ x, y };
 
             // Draw the floor beneath
             if (p.type != Empty) {
@@ -134,34 +180,30 @@ void drawLevel(Game *game) {
 }
 
 bool pushBoxes(Level* level, Vector2 next, int x, int y) {
-    bool canMove = false;
-
-    // The player can only push a chain of boxes horizontally or vertically
-    // We need to figure out where the last box they'll be pushing is
+    // get the position of the last box that'll be pushed
     Vector2 end = next;
     while (true) {
         Piece p = level->pieces[(int)(end.y * level->width + end.x)];
         if (p.type != Box) {
-            canMove = p.type != Border;
+            if (p.type == Border || (p.type == Box && p.boxSlide.active))
+                return false; // wall's in the way or the slide animation's running
             break;
         }
         end.x += x;
         end.y += y;
     }
 
-    // We can only push one box at a time, so we can just
-    // move the box on the tile the player will move to next
-    // to the end of the chain
-    if (canMove) {
-        int endIndex = end.y * level->width + end.x;
-        int nextIndex = next.y * level->width + next.x;
-        level->pieces[endIndex].type = level->pieces[nextIndex].type;
-
-        level->pieces[nextIndex].isGoal = level->original[nextIndex].isGoal;
-        level->pieces[nextIndex].type = Empty;
+    // start the box sliding animation
+    Vector2 pos = { end.x - x, end.y - y };
+    while (pos.x != next.x - x || pos.y != next.y - y) {
+        int current = pos.y * level->width + pos.x;
+        Vector2 after = { pos.x + x, pos.y + y };
+        startAnimation(&level->pieces[current].boxSlide, after, false);
+        pos.x -= x;
+        pos.y -= y;
     }
 
-    return canMove;
+    return true;
 }
 
 bool movePlayer(Game* game, int deltaX, int deltaY) {

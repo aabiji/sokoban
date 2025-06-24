@@ -2,6 +2,7 @@
 #define LEVELS_H
 
 #include <stdbool.h>
+#include "animation.h"
 
 #define NUM_LEVELS 50
 #define MAX_LINES 40
@@ -15,6 +16,7 @@ typedef struct {
         bool isCorner;
         bool isSplitWall;
     } border;
+    Animation boxSlide;
 } Piece;
 
 typedef struct {

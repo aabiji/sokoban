@@ -1,4 +1,5 @@
 #include <math.h>
+#include <raymath.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -43,13 +44,15 @@ Piece getPiece(Line* lines, int width, int height, int x, int y) {
     if (x >= lines[y].length) return p;
     char c = lines[y].str[x];
 
-    if (c == '$') p = (Piece){ Box, false };
-    if (c == '.') p = (Piece){ Empty, true };
-    if (c == '*') p = (Piece){ Box, true };
     if (c == '#') {
         p = (Piece){ Border, false };
         getBorderOrientation(&p, lines, width, height, x, y);
     }
+    if (c == '$' || c == '*') {
+        p = (Piece){ Box, c == '*' };
+        p.boxSlide = createAnimation((Vector2){ x, y }, false, 0.5);
+    }
+    if (c == '.') p = (Piece){ Empty, true };
     return p;
 }
 
@@ -111,7 +114,7 @@ int parseLevels(char* filePath, Level* levels) {
 
     free(line);
     fclose(file);
-    return i != NUM_LEVELS ? -1 : 0;
+    return i + 1 != NUM_LEVELS ? -1 : 0;
 }
 
 // return true if all the goal positions are covered by a box
