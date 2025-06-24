@@ -192,9 +192,6 @@ void updateApp(void *data) {
 TODO:
 - Improve the animation system
   The player should do a little bounce then turn animation when rotating
-- Use these https://sona-sar.itch.io/voxel-animals-items-pack-free-assets
-  assets instead
-  Use trees as borders instead of walls
 - Add some basic phong lighting
   change the camera perspective to be more isometric without hurting the
   view the player has on the board
