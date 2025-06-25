@@ -23,7 +23,7 @@ App createApp() {
 
 void cleanupApp(App* app) {
     cleanupGame(&app->game);
-    UnloadShader(app->game.shader);
+    UnloadShader(app->game.assetManager.shader);
 }
 
 // Draw text centered at a point and return its bounding box
@@ -158,9 +158,8 @@ void gameloop(App* app) {
     if (IsKeyPressed(KEY_R)) restartLevel(&app->game);
 
     BeginMode3D(app->game.camera);
-    BeginShaderMode(app->game.shader);
-    updateLighting(&app->game);
-    drawLevel(&app->game);
+    BeginShaderMode(app->game.assetManager.shader);
+    drawGame(&app->game);
     EndShaderMode();
     EndMode3D();
 
@@ -178,7 +177,7 @@ void updateApp(void* data) {
     }
 
     BeginDrawing();
-    ClearBackground((Color){135, 206, 250, 255});
+    ClearBackground((Color){ 118, 199, 249, 255 });
 
     if (app->drawingMenu)
         drawMenu(app);
@@ -190,8 +189,7 @@ void updateApp(void* data) {
 
 /*
 TODO:
-- Improve the lighting
-  It looks really flat and really bland. fix that. Add shadows? Change light colors?
+- Zoom the camera in when the level is large
 - Find a royalty free, chill, fun and calming soundtrack
   Also find sound effects for clicking buttons, moving the player,
   pushing boxes and finishing a level

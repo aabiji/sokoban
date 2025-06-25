@@ -2,15 +2,12 @@
 #include <string.h>
 #include "assets.h"
 
-Asset loadAsset(
-    Shader shader, Texture2D texture,
-    Vector3 targetSize, const char *path
-) {
+Asset loadAsset(AssetManager* am, Texture2D texture, const char *path) {
     Asset asset;
     asset.model = LoadModel(path);
 
     asset.model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture;
-    asset.model.materials[0].shader = shader;
+    asset.model.materials[0].shader = am->shader;
 
     Mesh mesh = asset.model.meshes[0];
     if (mesh.normals == NULL)
@@ -25,19 +22,19 @@ Asset loadAsset(
 
     // scale with correct aspect ratio
     float biggestSide = fmax(fmax(asset.size.x, asset.size.y), asset.size.z);
-    Vector3 f = {
-        targetSize.x / biggestSide,
-        targetSize.y / biggestSide,
-        targetSize.z / biggestSide
+    asset.scaleFactor = (Vector3){
+        am->tileSize.x / biggestSide,
+        am->tileSize.y / biggestSide,
+        am->tileSize.z / biggestSide
     };
-    asset.scaleFactor = targetSize.x > 0 ? f : (Vector3){ 1, 1, 1 };
     return asset;
 }
 
-AssetManager loadAssets(Shader shader) {
+AssetManager loadAssets() {
     AssetManager am = {
         .tileSize = (Vector3){2.5, 2.5, 2.5},
-        .font = LoadFont("assets/fonts/Grobold.ttf")
+        .font = LoadFont("assets/fonts/SuperPlayful.ttf"),
+        .shader = LoadShader("assets/shaders/vertex.glsl", "assets/shaders/fragment.glsl")
     };
 
     char* paths[] = {
@@ -45,12 +42,12 @@ AssetManager loadAssets(Shader shader) {
         "assets/Main/Green/grass1/grass1.vox",
         "assets/Main/Green/nograss/nograss.vox",
         "assets/Main/Green/box1/box1.vox",
-        "assets/Animals/Piglet/piglet.vox"
+        "assets/Animals/Panda/panda.vox"
     };
     for (int i = 0; i < NumAssets; i++) {
         am.textures[i] = LoadTexture(TextFormat("%s.png", paths[i]));
         const char* path = TextFormat("%s.obj", paths[i]);
-        am.assets[i] = loadAsset(shader, am.textures[i], am.tileSize, path);
+        am.assets[i] = loadAsset(&am, am.textures[i], path);
     }
 
     return am;

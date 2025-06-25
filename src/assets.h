@@ -15,12 +15,13 @@ typedef struct {
 
 typedef struct {
     Font font;
+    Shader shader;
     Texture textures[NumAssets];
     Asset assets[NumAssets];
     Vector3 tileSize;
 } AssetManager;
 
-AssetManager loadAssets(Shader shader);
+AssetManager loadAssets();
 void drawAsset(
     AssetManager* am, AssetType type, Vector3 offset,
     Vector2 position, float rotation, bool offsetHeight
