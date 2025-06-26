@@ -1,5 +1,6 @@
 #include "game.h"
 #include "levels.h"
+#include "raylib.h"
 
 #if defined(PLATFORM_WEB)
     #include <emscripten/emscripten.h>
@@ -8,16 +9,18 @@
 typedef struct {
     Game game;
     Animation fade;
-    bool drawingMenu;
     bool quit;
+    Vector2 windowSize;
+    enum { HELP, LEVEL_SELECT, GAME } screen;
 } App;
 
-App createApp() {
+App createApp(Vector2 windowSize) {
     App app;
+    app.windowSize = windowSize;
     app.game = createGame();
     app.fade = createAnimation((Vector2){0, 0}, true, TRANSISTION_SPEED);
     app.quit = false;
-    app.drawingMenu = true;
+    app.screen = LEVEL_SELECT;
     return app;
 }
 
@@ -48,7 +51,7 @@ void drawFadeAnimation(App* app) {
     updateAnimation(&app->fade, GetFrameTime());
     float alpha = 255.0 - (255.0 * app->fade.scalar.value);
 
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(),
+    DrawRectangle(0, 0, app->windowSize.x, app->windowSize.y,
                   (Color){0, 0, 0, alpha});
 }
 
@@ -61,18 +64,20 @@ Color brightenColor(Color c, float amount) {
     return new;
 }
 
-void drawMenu(App* app) {
+void drawLevelSelect(App* app) {
     centerText(app->game.assetManager.font, "Sokoban",
-               (Vector2){(float)GetScreenWidth() / 2, 50}, 45, 0, WHITE);
+               (Vector2){ app->windowSize.x / 2, 50 }, 45, 0, WHITE);
+
+    //printf("%f\n", app->windowSize.x / 2);
 
     float cols = 10;
     int rows = NUM_LEVELS / cols;
     float amount =
         cols + ((cols + 1) / 2); // The columns and the space in between them
-    float w = GetScreenWidth() > 1000 ? 900 : GetScreenWidth();
+    float w = app->windowSize.x > 1000 ? 900 : app->windowSize.x;
     float boxSize = w / amount;
 
-    float startX = ((GetScreenWidth() - boxSize * amount) / 2) + (boxSize / 2);
+    float startX = ((app->windowSize.x - boxSize * amount) / 2) + (boxSize / 2);
     Vector2 pos = {startX, 100};
     bool hovering = false;
 
@@ -89,7 +94,7 @@ void drawMenu(App* app) {
                 hovering = true;
                 c = brightenColor(c, 0.2);
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                    app->drawingMenu = false;
+                    app->screen = GAME;
                     changeLevel(&app->game, level, false);
                     startAnimation(&app->fade, (Vector2){ 1, 1 }, true);
                     break;
@@ -108,7 +113,7 @@ void drawMenu(App* app) {
         pos.x = startX;
     }
 
-    Vector2 bottom = {(float)GetScreenWidth() / 2, GetScreenHeight() - 50};
+    Vector2 bottom = { app->windowSize.x / 2, app->windowSize.y - 50 };
     centerText(app->game.assetManager.font, "(C) 2025- @aabiji", bottom, 15, 0, WHITE);
     drawFadeAnimation(app);
 
@@ -116,6 +121,10 @@ void drawMenu(App* app) {
         SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
     else
         SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+}
+
+void drawHelpScreen(App* app) {
+
 }
 
 void drawGameInfo(App* app) {
@@ -127,7 +136,7 @@ void drawGameInfo(App* app) {
     if (mouseInside(box)) {
         SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-            app->drawingMenu = true;
+            app->screen = LEVEL_SELECT;
             startAnimation(&app->fade, (Vector2){1, 1}, true);
         }
     } else {
@@ -170,17 +179,20 @@ void gameloop(App* app) {
 void updateApp(void* data) {
     App* app = (App*)data;
 
-    if (WindowShouldClose()) {
+    if (WindowShouldClose() ||
+        IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_CAPS_LOCK)) {
         savePlayerData(&app->game);
         app->quit = true;
         return;
     }
 
     BeginDrawing();
-    ClearBackground((Color){ 118, 199, 249, 255 });
+    ClearBackground((Color){ 163, 208, 229, 255 });
 
-    if (app->drawingMenu)
-        drawMenu(app);
+    if (app->screen == LEVEL_SELECT)
+        drawLevelSelect(app);
+    else if (app->screen == HELP)
+        drawHelpScreen(app);
     else
         gameloop(app);
 
@@ -189,25 +201,30 @@ void updateApp(void* data) {
 
 /*
 TODO:
-- Zoom the camera in when the level is large
 - Find a royalty free, chill, fun and calming soundtrack
   Also find sound effects for clicking buttons, moving the player,
   pushing boxes and finishing a level
 - Add nicer transitions. Instead of just a fade in, add text for what
   screen you're transitioning to and have a more developped background animation
-- Add more puzzles
   Improve the level selection screen
 - Add a help screen
 - Use Emscripten to port to web
 - Release on hackernews (June 27)
+Improve the buttons
+Better background?
 */
 
 int main() {
     SetTraceLogLevel(LOG_WARNING);
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_MAXIMIZED | FLAG_MSAA_4X_HINT);
-    InitWindow(800, 600, "Sokoban");
+    SetConfigFlags(FLAG_FULLSCREEN_MODE | FLAG_MSAA_4X_HINT);
+    InitWindow(0, 0, "Sokoban");
+    InitAudioDevice();
 
-    App app = createApp();
+    Vector2 windowSize = {
+        GetMonitorWidth(GetCurrentMonitor()),
+        GetMonitorHeight(GetCurrentMonitor())
+    };
+    App app = createApp(windowSize);
 
 #if defined(PLATFORM_WEB)
     emscripten_set_main_loop_arg(updateGameWrapper, &app, 60, 1);
@@ -218,5 +235,6 @@ int main() {
 #endif
 
     cleanupApp(&app);
+    CloseAudioDevice();
     CloseWindow();
 }

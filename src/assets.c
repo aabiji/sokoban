@@ -1,9 +1,10 @@
 #include <math.h>
 #include <string.h>
 #include "assets.h"
+#include "raylib.h"
 
-Asset loadAsset(AssetManager* am, Texture2D texture, const char *path) {
-    Asset asset;
+ModelAsset loadModel(AssetManager* am, Texture2D texture, const char *path) {
+    ModelAsset asset;
     asset.model = LoadModel(path);
 
     asset.model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture;
@@ -37,6 +38,11 @@ AssetManager loadAssets() {
         .shader = LoadShader("assets/shaders/vertex.glsl", "assets/shaders/fragment.glsl")
     };
 
+    am.sounds[MoveSfx] = LoadSound("assets/sounds/step.wav");
+    am.sounds[PushSfx] = LoadSound("assets/sounds/pop.mp3");
+    am.sounds[SuccessSfx] = LoadSound("assets/sounds/success.mp3");
+    am.sounds[BackgroundMusic] = LoadSound("assets/sounds/background.mp3");
+
     char* paths[] = {
         "assets/Main/Green/tree2/tree2.vox",
         "assets/Main/Green/grass1/grass1.vox",
@@ -44,19 +50,19 @@ AssetManager loadAssets() {
         "assets/Main/Green/box1/box1.vox",
         "assets/Animals/Panda/panda.vox"
     };
-    for (int i = 0; i < NumAssets; i++) {
+    for (int i = 0; i < NumModels; i++) {
         am.textures[i] = LoadTexture(TextFormat("%s.png", paths[i]));
         const char* path = TextFormat("%s.obj", paths[i]);
-        am.assets[i] = loadAsset(&am, am.textures[i], path);
+        am.assets[i] = loadModel(&am, am.textures[i], path);
     }
 
     return am;
 }
 
-void drawAsset(
-    AssetManager* am, AssetType type, Vector3 offset,
+void drawModel(
+    AssetManager* am, ModelType type, Vector3 offset,
     Vector2 position, float rotation, bool offsetHeight) {
-    Asset asset = am->assets[type];
+    ModelAsset asset = am->assets[type];
     Vector3 axis = { 0, 1, 0 };
     Vector3 realPos = {
         offset.x + position.x * am->tileSize.x,
@@ -66,10 +72,19 @@ void drawAsset(
     DrawModelEx(asset.model, realPos, axis, rotation, asset.scaleFactor, WHITE);
 }
 
+void playSound(AssetManager* am, Sounds sound) {
+    if (!IsSoundPlaying(am->sounds[sound]))
+        PlaySound(am->sounds[sound]);
+}
+
 void cleanupAssets(AssetManager* am) {
     UnloadFont(am->font);
-    for (int i = 0; i < NumAssets; i++) {
+    for (int i = 0; i < NumModels; i++) {
         UnloadModel(am->assets[i].model);
         UnloadTexture(am->textures[i]);
+    }
+    for (int i = 0; i < NumSounds; i++) {
+        StopSound(am->sounds[i]);
+        UnloadSound(am->sounds[i]);
     }
 }

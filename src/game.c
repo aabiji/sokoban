@@ -3,7 +3,9 @@
 #include <string.h>
 
 #include "game.h"
+#include "assets.h"
 #include "levels.h"
+#include "raylib.h"
 
 Game createGame() {
     Game game = { .numMoves = 0 };
@@ -44,6 +46,7 @@ void orientCamera(Game* game) {
     // Camera distance needed to be to be able to fully see the longest side
     float longerSide = fmax(w, h);
     float distance = (longerSide / 2.0) / tanf((45 * DEG2RAD) / 2.0);
+    distance = fmax(45, fmin(distance, 80)); // shouldn't be too zoomed in or zoomed out
 
     // coordinates necessary to tilt the camera back (tilting the content forwards)
     float tilt = -28.0 * DEG2RAD;
@@ -59,14 +62,17 @@ void orientCamera(Game* game) {
     // to ensure the level is centered on screen
     game->drawOffset = (Vector3){
         game->assetManager.tileSize.x, 0.0,
-        game->assetManager.tileSize.z / 2.0
+        h > 50 ? -game->assetManager.tileSize.z / 2.0 : 0
     };
 }
 
 void changeLevel(Game* game, int levelIndex, bool advance) {
-    if (advance) levelIndex = game->level + 1;
-    game->level = fmax(0, fmin(levelIndex, NUM_LEVELS - 1));
+    if (advance) {
+        levelIndex = game->level + 1;
+        playSound(&game->assetManager, SuccessSfx);
+    }
 
+    game->level = fmax(0, fmin(levelIndex, NUM_LEVELS - 1));
     orientCamera(game);
 
     Level* level = &game->levels[game->level];
@@ -108,7 +114,7 @@ void getFirstAndLastWalls(Level* level, int row, int* first, int* last) {
     }
 }
 
-AssetType getAssetType(Piece p) {
+ModelType getModelType(Piece p) {
     if (p.type == Border) return Wall;
     if (p.type == Box) return Crate;
     return p.isGoal ? Goal : Floor;
@@ -149,6 +155,8 @@ void updateBoxAnimations(Game* game) {
 }
 
 void drawGame(Game* game) {
+    playSound(&game->assetManager, BackgroundMusic);
+ 
     updateBoxAnimations(game);
     Level level = game->levels[game->level];
 
@@ -161,26 +169,26 @@ void drawGame(Game* game) {
             if (x < first || x > last) continue; // Not inside the bordering walls
 
             Piece p = level.pieces[y * level.width + x];
-            AssetType type = getAssetType(p);
+            ModelType type = getModelType(p);
             Vector2 pos = { x, y };
             Vector2 realPos = p.type == Box ? p.boxSlide.vector.value : pos;
 
             // Draw the floor beneath
             if (p.type != Empty) {
-                AssetType t = p.isGoal ? Goal : Floor;
-                drawAsset(&game->assetManager, t, game->drawOffset, pos, 0, false);
+                ModelType t = p.isGoal ? Goal : Floor;
+                drawModel(&game->assetManager, t, game->drawOffset, pos, 0, false);
             }
 
             // Wall, Floor, Goal, Crate, Guy, NumAssets,
             Vector3 offset = game->drawOffset;
             if (p.type == Border) offset.y = 1.0;
             else if (p.type != Empty) offset.y = 0.5;
-            drawAsset(&game->assetManager, type, offset, realPos, 0, p.type != Empty);
+            drawModel(&game->assetManager, type, offset, realPos, 0, p.type != Empty);
         }
     }
 
     // Draw the player
-    drawAsset(
+    drawModel(
         &game->assetManager,
         Guy,
         game->drawOffset,
@@ -222,6 +230,7 @@ bool pushBoxes(Game* game, Vector2 next, int x, int y) {
         pos.y -= y;
     }
 
+    playSound(&game->assetManager, MoveSfx);
     return true;
 }
 

@@ -4,28 +4,34 @@
 #include <raylib.h>
 
 typedef enum {
-    Wall, Floor, Goal, Crate, Guy, NumAssets,
-} AssetType;
+    Wall, Floor, Goal, Crate, Guy, NumModels,
+} ModelType;
+
+typedef enum {
+    MoveSfx, PushSfx, SuccessSfx, BackgroundMusic, NumSounds,
+} Sounds;
 
 typedef struct {
     Model model;
     Vector3 size;
     Vector3 scaleFactor;
-} Asset;
+} ModelAsset;
 
 typedef struct {
     Font font;
     Shader shader;
-    Texture textures[NumAssets];
-    Asset assets[NumAssets];
+    Texture textures[NumModels];
+    ModelAsset assets[NumModels];
+    Sound sounds[NumSounds];
     Vector3 tileSize;
 } AssetManager;
 
 AssetManager loadAssets();
-void drawAsset(
-    AssetManager* am, AssetType type, Vector3 offset,
+void drawModel(
+    AssetManager* am, ModelType type, Vector3 offset,
     Vector2 position, float rotation, bool offsetHeight
 );
+void playSound(AssetManager* am, Sounds sound);
 void cleanupAssets(AssetManager* am);
 
 #endif
