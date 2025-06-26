@@ -69,7 +69,7 @@ void orientCamera(Game* game) {
 void changeLevel(Game* game, int levelIndex, bool advance) {
     if (advance) {
         levelIndex = game->level + 1;
-        playSound(&game->assetManager, SuccessSfx);
+        updateSound(&game->assetManager, SuccessSfx, true);
     }
 
     game->level = fmax(0, fmin(levelIndex, NUM_LEVELS - 1));
@@ -135,8 +135,6 @@ void updateBoxAnimations(Game* game) {
 }
 
 void drawGame(Game* game) {
-    playSound(&game->assetManager, BackgroundMusic);
- 
     updateBoxAnimations(game);
     Level level = game->levels[game->level];
 
@@ -210,7 +208,7 @@ bool pushBoxes(Game* game, Vector2 next, int x, int y) {
         pos.y -= y;
     }
 
-    playSound(&game->assetManager, MoveSfx);
+    updateSound(&game->assetManager, MoveSfx, true);
     return true;
 }
 

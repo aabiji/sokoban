@@ -36,6 +36,6 @@ Rectangle drawText(
     AssetManager* am, const char* text, Vector2 position,
     int fontSize, Color color); // draw text and return its (x,y,width,height)
 
-void playSound(AssetManager* am, Sounds sound);
+void updateSound(AssetManager* am, Sounds sound, bool play);
 
 #endif

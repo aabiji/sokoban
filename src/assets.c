@@ -41,7 +41,7 @@ AssetManager loadAssets() {
     am.sounds[MoveSfx] = LoadSound("assets/sounds/step.wav");
     am.sounds[PushSfx] = LoadSound("assets/sounds/pop.mp3");
     am.sounds[SuccessSfx] = LoadSound("assets/sounds/success.mp3");
-    am.sounds[BackgroundMusic] = LoadSound("assets/sounds/background.mp3");
+    am.sounds[BackgroundMusic] = LoadSound("assets/sounds/sunshine.mp3");
 
     char* paths[] = {
         "assets/Main/Green/tree2/tree2.vox",
@@ -72,9 +72,12 @@ void drawModel(
     DrawModelEx(asset.model, realPos, axis, rotation, asset.scaleFactor, WHITE);
 }
 
-void playSound(AssetManager* am, Sounds sound) {
-    if (!IsSoundPlaying(am->sounds[sound]))
+void updateSound(AssetManager* am, Sounds sound, bool play) {
+    bool alreadyPlaying = IsSoundPlaying(am->sounds[sound]);
+    if (!alreadyPlaying && play)
         PlaySound(am->sounds[sound]);
+    else if (alreadyPlaying && !play)
+        StopSound(am->sounds[sound]);
 }
 
 Rectangle drawText(

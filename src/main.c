@@ -1,3 +1,4 @@
+#include "assets.h"
 #include "game.h"
 #include "levels.h"
 #include "raylib.h"
@@ -6,21 +7,35 @@
     #include <emscripten/emscripten.h>
 #endif
 
+typedef enum { HELP, LEVEL_SELECT, GAME } Screens;
+
 typedef struct {
     Game game;
     Animation fade;
-    bool quit;
     Vector2 windowSize;
-    enum { HELP, LEVEL_SELECT, GAME } screen;
+    bool quit;
+
+    Screens currentScreen;
+    Screens prevScreen;
+
+    // settings: TODO: save along with player state
+    bool enableBackgroundMusic;
+    bool fullscreen;
 } App;
 
 App createApp(Vector2 windowSize) {
     App app;
+    app.quit = false;
     app.windowSize = windowSize;
+
     app.game = createGame();
     app.fade = createAnimation((Vector2){0, 0}, true, TRANSISTION_SPEED);
-    app.quit = false;
-    app.screen = LEVEL_SELECT;
+
+    app.currentScreen = LEVEL_SELECT;
+    app.prevScreen = LEVEL_SELECT;
+
+    app.enableBackgroundMusic = true;
+    app.fullscreen = true;
     return app;
 }
 
@@ -83,7 +98,8 @@ void drawLevelSelect(App* app) {
                 hovering = true;
                 c = brightenColor(c, 0.2);
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                    app->screen = GAME;
+                    app->currentScreen = GAME;
+                    app->prevScreen = GAME;
                     changeLevel(&app->game, level, false);
                     startAnimation(&app->fade, (Vector2){ 1, 1 }, true);
                     break;
@@ -113,19 +129,44 @@ void drawLevelSelect(App* app) {
 }
 
 void drawHelpScreen(App* app) {
-    // TODO: go to the previous screen
-    // go to the level select screen
+    // go to the previous screen
     Rectangle box =
         drawText(&app->game.assetManager, "<", (Vector2){20, 25}, 50, WHITE);
     if (mouseInside(box)) {
         SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-            app->screen = LEVEL_SELECT;
+            app->currentScreen = app->prevScreen;
             startAnimation(&app->fade, (Vector2){1, 1}, true);
         }
     } else {
         SetMouseCursor(MOUSE_CURSOR_DEFAULT);
     }
+
+    const char* info[6] = {
+        "This is a puzzle game where your goal",
+        "is to push boxes into the target positions",
+        "Press Esc to exit the game",
+        "Press f to toggle fullscreen",
+        "Press m to toggle the background music",
+        "Use the arrow keys or W, A, S, D to move the player"
+    };
+    for (int i = 0; i < 6; i++) {
+        drawText(
+            &app->game.assetManager, info[i],
+            (Vector2){ app->windowSize.x / 2, 100 + i * 65 }, 50, WHITE);
+    }
+
+    // TODO:
+    // find a better sound effect for moving and pushing boxes
+    // move all the game info to the left hand side
+    // make the go back and help button more prominent
+    // draw text in a better color
+    // change background when hovering buttons
+    // improve the lighting shaders
+    // loading solved levels doesn't seem to work anymore -- fix that
+    // improve the backround?
+    // port to web
+    // release
 }
 
 void drawGameInfo(App* app) {
@@ -137,7 +178,8 @@ void drawGameInfo(App* app) {
     if (mouseInside(box)) {
         SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-            app->screen = LEVEL_SELECT;
+            app->currentScreen = LEVEL_SELECT;
+            app->prevScreen = GAME;
             startAnimation(&app->fade, (Vector2){1, 1}, true);
         }
     } else {
@@ -149,7 +191,8 @@ void drawGameInfo(App* app) {
     if (mouseInside(box)) {
         SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-            app->screen = HELP;
+            app->currentScreen = HELP;
+            app->prevScreen = GAME;
             startAnimation(&app->fade, (Vector2){1, 1}, true);
         }
     } else {
@@ -177,15 +220,6 @@ void gameloop(App* app) {
         return;
     }
 
-    if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_A)) movePlayer(&app->game, 1, 0);
-    if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_D)) movePlayer(&app->game, -1, 0);
-    if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) movePlayer(&app->game, 0, -1);
-    if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) movePlayer(&app->game, 0, 1);
-    if (IsKeyPressed(KEY_R)) {
-        restartLevel(level);
-        changeLevel(&app->game, app->game.level, false);
-    }
-
     BeginMode3D(app->game.camera);
     BeginShaderMode(app->game.assetManager.shader);
     drawGame(&app->game);
@@ -196,9 +230,7 @@ void gameloop(App* app) {
     drawFadeAnimation(app);
 }
 
-void updateApp(void* data) {
-    App* app = (App*)data;
-
+void handleInput(App* app) {
     if (WindowShouldClose() ||
         IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_CAPS_LOCK)) {
         savePlayerData(&app->game);
@@ -206,12 +238,43 @@ void updateApp(void* data) {
         return;
     }
 
+    if (IsKeyPressed(KEY_F))
+        app->fullscreen = !app->fullscreen;
+
+    if (IsKeyPressed(KEY_M))
+        app->enableBackgroundMusic = !app->enableBackgroundMusic;
+
+    if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_A))
+        movePlayer(&app->game, 1, 0);
+
+    if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_D))
+        movePlayer(&app->game, -1, 0);
+
+    if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W))
+        movePlayer(&app->game, 0, -1);
+
+    if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S))
+        movePlayer(&app->game, 0, 1);
+
+    if (IsKeyPressed(KEY_R)) {
+        restartLevel(&app->game.levels[app->game.level]);
+        changeLevel(&app->game, app->game.level, false);
+    }
+
+}
+
+void updateApp(void* data) {
+    App* app = (App*)data;
+
+    handleInput(app);
+    updateSound(&app->game.assetManager, BackgroundMusic, app->enableBackgroundMusic);
+
     BeginDrawing();
     ClearBackground((Color){ 163, 208, 229, 255 });
 
-    if (app->screen == LEVEL_SELECT)
+    if (app->currentScreen == LEVEL_SELECT)
         drawLevelSelect(app);
-    else if (app->screen == HELP)
+    else if (app->currentScreen == HELP)
         drawHelpScreen(app);
     else
         gameloop(app);
@@ -219,24 +282,10 @@ void updateApp(void* data) {
     EndDrawing();
 }
 
-/*
-TODO:
-- Find a royalty free, chill, fun and calming soundtrack
-  Also find sound effects for clicking buttons, moving the player,
-  pushing boxes and finishing a level
-- Add nicer transitions. Instead of just a fade in, add text for what
-  screen you're transitioning to and have a more developped background animation
-  Improve the level selection screen
-- Add a help screen
-- Use Emscripten to port to web
-- Release on hackernews (June 27)
-Improve the buttons
-Better background?
-*/
-
 int main() {
     SetTraceLogLevel(LOG_WARNING);
-    SetConfigFlags(FLAG_FULLSCREEN_MODE | FLAG_MSAA_4X_HINT);
+    // TODO: set fullscreen mode from the loaded player data from here
+    SetConfigFlags(FLAG_FULLSCREEN_MODE | FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(0, 0, "Sokoban");
     InitAudioDevice();
 
