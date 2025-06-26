@@ -8,7 +8,7 @@
 #include "raylib.h"
 
 Game createGame() {
-    Game game = { .numMoves = 0 };
+    Game game = { .numBoxMoves = 0 };
 
     // Load the player data
     game.saveFile = "assets/save.dat";
@@ -82,26 +82,6 @@ void changeLevel(Game* game, int levelIndex, bool advance) {
     game->player.rotation = createAnimation((Vector2){ 0, 0 }, true, PLAYER_SPEED);
 }
 
-void restartLevel(Game* game) {
-    Level* l = &game->levels[game->level];
-    int size = l->width * l->height * sizeof(Piece);
-    memcpy(l->pieces, l->original, size);
-    changeLevel(game, game->level, false);
-}
-
-// return true if all the goal positions are covered by a box
-bool levelSolved(Game* game) {
-    Level* level = &game->levels[game->level];
-    for (int i = 0; i < level->numGoals; i++) {
-        int pos = level->goalIndexes[i];
-        Piece p = level->pieces[pos];
-        if (p.isGoal && p.type != Box) {
-            return false;
-        }
-    }
-    return true;
-}
-
 void getFirstAndLastWalls(Level* level, int row, int* first, int* last) {
     *first = level->width;
     *last = 0;
@@ -124,18 +104,18 @@ void updateBoxAnimations(Game* game) {
     Level* level = &game->levels[game->level];
     bool allDone = true;
 
-    for (int i = 0; i < game->numMoves; i++) {
+    for (int i = 0; i < game->numBoxMoves; i++) {
         int index = game->boxMoves[i];
         updateAnimation(&level->pieces[index].boxSlide, GetFrameTime());
         if (level->pieces[index].boxSlide.active)
             allDone = false;
     }
 
-    if (!allDone || game->numMoves == 0) return;
+    if (!allDone || game->numBoxMoves == 0) return;
 
     // once all the boxes are done animating, actually
     // move them to their target position
-    for (int i = 0; i < game->numMoves; i++) {
+    for (int i = 0; i < game->numBoxMoves; i++) {
         int index = game->boxMoves[i];
         Animation a = level->pieces[index].boxSlide;
 
@@ -151,7 +131,7 @@ void updateBoxAnimations(Game* game) {
             createAnimation(a.vector.start, false, PLAYER_SPEED);
     }
 
-    game->numMoves = 0;
+    game->numBoxMoves = 0;
 }
 
 void drawGame(Game* game) {
@@ -223,7 +203,7 @@ bool pushBoxes(Game* game, Vector2 next, int x, int y) {
         Vector2 after = { pos.x + x, pos.y + y };
 
         // save the index of each box that's animating in order
-        game->boxMoves[game->numMoves++] = current;
+        game->boxMoves[game->numBoxMoves++] = current;
         startAnimation(&level->pieces[current].boxSlide, after, false);
 
         pos.x -= x;
@@ -237,7 +217,7 @@ bool pushBoxes(Game* game, Vector2 next, int x, int y) {
 void movePlayer(Game* game, int deltaX, int deltaY) {
     // lock the player until animations are done running
     if (game->player.rotation.active || game->player.position.active ||
-        game->numMoves > 0) return;
+        game->numBoxMoves > 0) return;
 
     if (deltaX == 1)
         startAnimation(&game->player.rotation, (Vector2){90, 0}, false);

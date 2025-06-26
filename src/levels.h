@@ -25,5 +25,7 @@ typedef struct {
 } Level;
 
 int parseLevels(char* filePath, Level* levels);
+void restartLevel(Level* level);
+int countCompletedGoals(Level* level);
 
 #endif

@@ -87,3 +87,20 @@ int parseLevels(char* filePath, Level* levels) {
     fclose(file);
     return i != NUM_LEVELS ? -1 : 0;
 }
+
+void restartLevel(Level* level) {
+    int size = level->width * level->height * sizeof(Piece);
+    memcpy(level->pieces, level->original, size);
+}
+
+// return true if all the goal positions are covered by a box
+int countCompletedGoals(Level* level) {
+    int completed = 0;
+    for (int i = 0; i < level->numGoals; i++) {
+        int pos = level->goalIndexes[i];
+        Piece p = level->pieces[pos];
+        if (p.isGoal && p.type == Box)
+            completed++;
+    }
+    return completed;
+}

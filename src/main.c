@@ -29,15 +29,6 @@ void cleanupApp(App* app) {
     UnloadShader(app->game.assetManager.shader);
 }
 
-// Draw text centered at a point and return its bounding box
-Rectangle centerText(Font font, const char* text, Vector2 point, int fontSize,
-                     int spacing, Color color) {
-    Vector2 size = MeasureTextEx(font, text, fontSize, spacing);
-    Vector2 p = {point.x - size.x / 2, point.y - size.y / 2};
-    DrawTextEx(font, text, p, fontSize, spacing, color);
-    return (Rectangle){p.x, p.y, size.x, size.y};
-}
-
 const bool mouseInside(Rectangle r) {
     Vector2 p = GetMousePosition();
     return p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y &&
@@ -65,16 +56,14 @@ Color brightenColor(Color c, float amount) {
 }
 
 void drawLevelSelect(App* app) {
-    centerText(app->game.assetManager.font, "Sokoban",
-               (Vector2){ app->windowSize.x / 2, 50 }, 45, 0, WHITE);
-
-    //printf("%f\n", app->windowSize.x / 2);
+    drawText(&app->game.assetManager, "Sokoban",
+            (Vector2){ app->windowSize.x / 2, 50 }, 45, WHITE);
 
     float cols = 10;
     int rows = NUM_LEVELS / cols;
     float amount =
         cols + ((cols + 1) / 2); // The columns and the space in between them
-    float w = app->windowSize.x > 1000 ? 900 : app->windowSize.x;
+    float w = app->windowSize.x > 1000 ? 1000 : app->windowSize.x;
     float boxSize = w / amount;
 
     float startX = ((app->windowSize.x - boxSize * amount) / 2) + (boxSize / 2);
@@ -105,7 +94,7 @@ void drawLevelSelect(App* app) {
 
             const char* str = TextFormat("%d", level + 1);
             Vector2 p = {r.x + boxSize / 2, r.y + boxSize / 2};
-            centerText(app->game.assetManager.font, str, p, 20, 0, WHITE);
+            drawText(&app->game.assetManager, str, p, 40, WHITE);
 
             pos.x += boxSize * 1.5;
         }
@@ -114,7 +103,7 @@ void drawLevelSelect(App* app) {
     }
 
     Vector2 bottom = { app->windowSize.x / 2, app->windowSize.y - 50 };
-    centerText(app->game.assetManager.font, "(C) 2025- @aabiji", bottom, 15, 0, WHITE);
+    drawText(&app->game.assetManager, "(C) 2025- @aabiji", bottom, 35, WHITE);
     drawFadeAnimation(app);
 
     if (hovering)
@@ -124,15 +113,27 @@ void drawLevelSelect(App* app) {
 }
 
 void drawHelpScreen(App* app) {
-
+    // TODO: go to the previous screen
+    // go to the level select screen
+    Rectangle box =
+        drawText(&app->game.assetManager, "<", (Vector2){20, 25}, 50, WHITE);
+    if (mouseInside(box)) {
+        SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            app->screen = LEVEL_SELECT;
+            startAnimation(&app->fade, (Vector2){1, 1}, true);
+        }
+    } else {
+        SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+    }
 }
 
 void drawGameInfo(App* app) {
     Color c = (Color){210, 125, 45, 255};
 
-    // Draw the sidebar of text
+    // go to the level select screen
     Rectangle box =
-        centerText(app->game.assetManager.font, "<", (Vector2){20, 25}, 50, 0, WHITE);
+        drawText(&app->game.assetManager, "<", (Vector2){20, 25}, 50, WHITE);
     if (mouseInside(box)) {
         SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
@@ -143,18 +144,34 @@ void drawGameInfo(App* app) {
         SetMouseCursor(MOUSE_CURSOR_DEFAULT);
     }
 
-    const char* str = TextFormat("Level %d", app->game.level + 1);
-    DrawTextEx(app->game.assetManager.font, str, (Vector2){45, 12}, 30, 0, c);
+    // go to the help screen
+    box = drawText(&app->game.assetManager, "?", (Vector2){20, 75}, 50, WHITE);
+    if (mouseInside(box)) {
+        SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            app->screen = HELP;
+            startAnimation(&app->fade, (Vector2){1, 1}, true);
+        }
+    } else {
+        SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+    }
 
-    const char* str1 = TextFormat("%d moves", app->game.player.numMoves);
-    DrawTextEx(app->game.assetManager.font, str1, (Vector2){45, 52}, 30, 0, c);
+    const char* str = TextFormat("%d moves", app->game.player.numMoves);
+    drawText(&app->game.assetManager, str, (Vector2){ app->windowSize.x / 4, 20 }, 50, c);
 
-    const char* str2 = TextFormat("%d / %d", 10, 20);
-    DrawTextEx(app->game.assetManager.font, str2, (Vector2){45, 92}, 30, 0, c);
+    const char* str1 = TextFormat("Level %d", app->game.level + 1);
+    drawText(&app->game.assetManager, str1, (Vector2){ app->windowSize.x / 2, 20 }, 50, c);
+
+    Level* level = &app->game.levels[app->game.level];
+    const char* str2 = TextFormat(
+        "%d / %d boxes", countCompletedGoals(level), level->numGoals);
+    drawText(&app->game.assetManager, str2, (Vector2){ app->windowSize.x / 1.25, 20 }, 50, c);
 }
 
 void gameloop(App* app) {
-    if (levelSolved(&app->game)) {
+    Level* level = &app->game.levels[app->game.level];
+
+    if (countCompletedGoals(level) == level->numGoals) { // solved the level
         changeLevel(&app->game, -1, true);
         startAnimation(&app->fade, (Vector2){1, 1}, true);
         return;
@@ -164,7 +181,10 @@ void gameloop(App* app) {
     if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_D)) movePlayer(&app->game, -1, 0);
     if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) movePlayer(&app->game, 0, -1);
     if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) movePlayer(&app->game, 0, 1);
-    if (IsKeyPressed(KEY_R)) restartLevel(&app->game);
+    if (IsKeyPressed(KEY_R)) {
+        restartLevel(level);
+        changeLevel(&app->game, app->game.level, false);
+    }
 
     BeginMode3D(app->game.camera);
     BeginShaderMode(app->game.assetManager.shader);

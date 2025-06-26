@@ -77,6 +77,17 @@ void playSound(AssetManager* am, Sounds sound) {
         PlaySound(am->sounds[sound]);
 }
 
+Rectangle drawText(
+    AssetManager* am, const char* text, Vector2 position,
+    int fontSize, Color color) {
+    // center the text at the target position
+    Vector2 size = MeasureTextEx(am->font, text, fontSize, 0);
+    position.x -= size.x / 2;
+    position.y -= size.y / 2;
+    DrawTextEx(am->font, text, position, fontSize, 0, color);
+    return (Rectangle){position.x, position.y, size.x, size.y};
+}
+
 void cleanupAssets(AssetManager* am) {
     UnloadFont(am->font);
     for (int i = 0; i < NumModels; i++) {

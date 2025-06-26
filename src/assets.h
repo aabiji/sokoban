@@ -27,11 +27,15 @@ typedef struct {
 } AssetManager;
 
 AssetManager loadAssets();
+void cleanupAssets(AssetManager* am);
+
 void drawModel(
     AssetManager* am, ModelType type, Vector3 offset,
-    Vector2 position, float rotation, bool offsetHeight
-);
+    Vector2 position, float rotation, bool offsetHeight);
+Rectangle drawText(
+    AssetManager* am, const char* text, Vector2 position,
+    int fontSize, Color color); // draw text and return its (x,y,width,height)
+
 void playSound(AssetManager* am, Sounds sound);
-void cleanupAssets(AssetManager* am);
 
 #endif

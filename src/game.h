@@ -7,7 +7,6 @@
 typedef struct {
     Animation position;
     Animation rotation;
-
     int numMoves;
     bool solvedLevels[NUM_LEVELS];
 } Player;
@@ -23,8 +22,7 @@ typedef struct {
     int level;
     Level levels[NUM_LEVELS];
     Vector3 drawOffset;
-
-    int numMoves;
+    int numBoxMoves;
     int boxMoves[25];
 } Game;
 
@@ -33,7 +31,6 @@ void cleanupGame(Game* game);
 void drawGame(Game* game);
 
 void changeLevel(Game* game, int levelIndex, bool advance);
-void restartLevel(Game* game);
 
 bool levelSolved(Game* game);
 int savePlayerData(Game* game);
