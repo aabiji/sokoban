@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.24...3.30)
+cmake_minimum_required(VERSION 3.28..)
 project(sokoban)
 
 include(FetchContent)
@@ -24,6 +24,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY $<TARGET_FILE_DIR:${PROJECT_NAME}>)
 
+# copy the assets
 if ("${PLATFORM}" STREQUAL "Web")
     add_custom_command(
         TARGET ${PROJECT_NAME} PRE_BUILD
@@ -36,14 +37,21 @@ else()
     )
 endif()
 
-#set(raylib_VERBOSE 1)
 target_link_libraries(${PROJECT_NAME} raylib)
 
-# Web Configurations
+# Create an output html file using the shell file
 if ("${PLATFORM}" STREQUAL "Web")
-    # Tell Emscripten to build an example.html file.
     set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX ".html")
-    target_link_options(${PROJECT_NAME} PUBLIC -sUSE_GLFW=3 PUBLIC --preload-file assets)
+    target_link_options(
+        ${PROJECT_NAME} PUBLIC
+        -sUSE_GLFW=3
+        --preload-file assets
+        -sEXPORTED_RUNTIME_METHODS=['HEAPF32','HEAP32','HEAPU8']
+        -sALLOW_MEMORY_GROWTH=1
+        -sINITIAL_MEMORY=64MB
+        -sSTACK_SIZE=4194304
+        "--shell-file=${CMAKE_SOURCE_DIR}/src/emscripten_template.html"
+    )
 endif()
 
 # Checks if OSX and links appropriate frameworks (Only required on MacOS)

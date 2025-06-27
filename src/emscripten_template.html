@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <title>Sokoban</title>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <style>
+      @font-face {
+        font-family: "SuperPlayful";
+        src: url("assets/fonts/SuperPlayful.ttf");
+      }
+
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        font-family: "SuperPlayful";
+        background-color: rgba(163, 208, 229, 1);
+      }
+
+      h1, h3 { text-align: center; }
+
+      #progress {
+        background-color: darkblue;
+        width: 1;
+      }
+
+      #canvas, #error-screen, #loading-screen {
+        display: none;
+        justify-content: center;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        height: 100%;
+      }
+ 
+      #progress-container {
+        width: 200px;
+        height: 8px;
+        border-radius: 8px;
+        background-color: lightgrey;
+        border: 1px dashed lightgrey;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="loading-screen">
+      <h1> Loading </h1>
+      <div id="progress-container"> <div id="progress"></div> </div>
+    </div>
+
+    <div id="error-screen">
+      <h1 id="error-msg"></h1>
+      <h3> Maybe reload? </h3>
+    </div>
+
+    <canvas
+      class="emscripten" id="canvas" tabindex=-1
+      oncontextmenu="event.preventDefault()"></canvas>
+
+    <script type="text/javascript">
+      const progressContainer = document.getElementById("progress-container");
+      const progress = document.getElementById("progress");
+      const loadingScreen = document.getElementById("loading-screen");
+      const errorScreen = document.getElementById("error-screen");
+      const errorMsg = document.getElementById("error-msg");
+      const canvas = document.getElementById("canvas");
+
+      loadingScreen.style.display = "flex"; // first "screen" that'll show
+
+      const setStatus = (text) => {
+        // show the canvas when ready
+        if (text.includes("Running")) {
+          loadingScreen.style.display = "none";
+          canvas.style.display = "flex";
+          return;
+        }
+
+        // handle errors
+        const parts = text.split("error: ");
+        if (parts && parts.length == 2) {
+          errorMsg.innerText = parts[1];
+          errorScreen.style.display = "flex";
+          canvas.style.display = "none";
+          return;
+        }
+
+        // set the progress bar
+        const nums = text.match(/\d+/);
+        if (nums && nums.length == 2) {
+          const percentage = (parseInt(nums[0]) / parseInt(nums[1]));
+          progress.style.width = `${percentage * progressContainer.offsetWidth}px`;
+        }
+      }
+
+      var Module = { canvas, setStatus };
+
+      canvas.addEventListener("webglcontextlost", (event) => {
+        Module.setStatus("error: WebGL context was lost");
+        event.preventDefault();
+      });
+
+      window.onerror = (event) => Module.setStatus("error: Something went wrong :(");
+    </script>
+    {{{ SCRIPT }}}
+  </body>
+</html>

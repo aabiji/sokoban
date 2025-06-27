@@ -2,6 +2,7 @@
 #define ASSETS_H
 
 #include <raylib.h>
+#include "levels.h"
 
 typedef enum {
     Wall, Floor, Goal, Crate, Guy, NumModels,
@@ -12,6 +13,12 @@ typedef enum {
 } Sounds;
 
 typedef struct {
+    bool solvedLevels[NUM_LEVELS];
+    bool playBgMusic;
+    bool fullscreen;
+} SaveData;
+
+typedef struct {
     Model model;
     Vector3 size;
     Vector3 scaleFactor;
@@ -20,10 +27,14 @@ typedef struct {
 typedef struct {
     Font font;
     Shader shader;
-    Texture textures[NumModels];
-    ModelAsset assets[NumModels];
     Sound sounds[NumSounds];
+
     Vector3 tileSize;
+    ModelAsset assets[NumModels];
+    Texture textures[NumModels];
+
+    SaveData data;
+    const char* saveFile;
 } AssetManager;
 
 AssetManager loadAssets();
@@ -37,5 +48,7 @@ Rectangle drawText(
     int fontSize, Color color); // draw text and return its (x,y,width,height)
 
 void updateSound(AssetManager* am, Sounds sound, bool play);
+
+int persistData(AssetManager* am);
 
 #endif

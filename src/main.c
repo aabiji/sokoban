@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "assets.h"
 #include "game.h"
 #include "levels.h"
@@ -10,38 +11,30 @@
 typedef enum { HELP, LEVEL_SELECT, GAME } Screens;
 
 typedef struct {
-    Game game;
+    Game* game;
     Animation fade;
     Vector2 windowSize;
     bool quit;
-
     Screens currentScreen;
     Screens prevScreen;
-
-    // settings: TODO: save along with player state
-    bool enableBackgroundMusic;
-    bool fullscreen;
 } App;
 
-App createApp(Vector2 windowSize) {
-    App app;
-    app.quit = false;
-    app.windowSize = windowSize;
+App* createApp() {
+    App* app = calloc(1, sizeof(App));
+    app->quit = false;
 
-    app.game = createGame();
-    app.fade = createAnimation((Vector2){0, 0}, true, TRANSISTION_SPEED);
+    app->game = createGame();
+    app->fade = createAnimation((Vector2){0, 0}, true, TRANSISTION_SPEED);
 
-    app.currentScreen = LEVEL_SELECT;
-    app.prevScreen = LEVEL_SELECT;
-
-    app.enableBackgroundMusic = true;
-    app.fullscreen = true;
+    app->currentScreen = LEVEL_SELECT;
+    app->prevScreen = LEVEL_SELECT;
     return app;
 }
 
 void cleanupApp(App* app) {
-    cleanupGame(&app->game);
-    UnloadShader(app->game.assetManager.shader);
+    cleanupGame(app->game);
+    UnloadShader(app->game->assetManager.shader);
+    free(app);
 }
 
 const bool mouseInside(Rectangle r) {
@@ -71,7 +64,7 @@ Color brightenColor(Color c, float amount) {
 }
 
 void drawLevelSelect(App* app) {
-    drawText(&app->game.assetManager, "Sokoban",
+    drawText(&app->game->assetManager, "Sokoban",
             (Vector2){ app->windowSize.x / 2, 50 }, 45, WHITE);
 
     float cols = 10;
@@ -91,8 +84,8 @@ void drawLevelSelect(App* app) {
             Rectangle r = {pos.x, pos.y, boxSize, boxSize};
             Color lightGreen = (Color){71, 194, 120, 255};
             Color darkGreen = (Color){32, 137, 107, 255};
-            Color c =
-                app->game.player.solvedLevels[level] ? darkGreen : lightGreen;
+            bool solved = app->game->assetManager.data.solvedLevels[level];
+            Color c = solved ? darkGreen : lightGreen;
 
             if (mouseInside(r)) {
                 hovering = true;
@@ -100,7 +93,7 @@ void drawLevelSelect(App* app) {
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                     app->currentScreen = GAME;
                     app->prevScreen = GAME;
-                    changeLevel(&app->game, level, false);
+                    changeLevel(app->game, level, false);
                     startAnimation(&app->fade, (Vector2){ 1, 1 }, true);
                     break;
                 }
@@ -110,7 +103,7 @@ void drawLevelSelect(App* app) {
 
             const char* str = TextFormat("%d", level + 1);
             Vector2 p = {r.x + boxSize / 2, r.y + boxSize / 2};
-            drawText(&app->game.assetManager, str, p, 40, WHITE);
+            drawText(&app->game->assetManager, str, p, 40, WHITE);
 
             pos.x += boxSize * 1.5;
         }
@@ -119,7 +112,7 @@ void drawLevelSelect(App* app) {
     }
 
     Vector2 bottom = { app->windowSize.x / 2, app->windowSize.y - 50 };
-    drawText(&app->game.assetManager, "(C) 2025- @aabiji", bottom, 35, WHITE);
+    drawText(&app->game->assetManager, "(C) 2025- @aabiji", bottom, 35, WHITE);
     drawFadeAnimation(app);
 
     if (hovering)
@@ -131,7 +124,7 @@ void drawLevelSelect(App* app) {
 void drawHelpScreen(App* app) {
     // go to the previous screen
     Rectangle box =
-        drawText(&app->game.assetManager, "<", (Vector2){20, 25}, 50, WHITE);
+        drawText(&app->game->assetManager, "<", (Vector2){20, 25}, 50, WHITE);
     if (mouseInside(box)) {
         SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
@@ -152,7 +145,7 @@ void drawHelpScreen(App* app) {
     };
     for (int i = 0; i < 6; i++) {
         drawText(
-            &app->game.assetManager, info[i],
+            &app->game->assetManager, info[i],
             (Vector2){ app->windowSize.x / 2, 100 + i * 65 }, 50, WHITE);
     }
 
@@ -174,7 +167,7 @@ void drawGameInfo(App* app) {
 
     // go to the level select screen
     Rectangle box =
-        drawText(&app->game.assetManager, "<", (Vector2){20, 25}, 50, WHITE);
+        drawText(&app->game->assetManager, "<", (Vector2){20, 25}, 50, WHITE);
     if (mouseInside(box)) {
         SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
@@ -187,7 +180,7 @@ void drawGameInfo(App* app) {
     }
 
     // go to the help screen
-    box = drawText(&app->game.assetManager, "?", (Vector2){20, 75}, 50, WHITE);
+    box = drawText(&app->game->assetManager, "?", (Vector2){20, 75}, 50, WHITE);
     if (mouseInside(box)) {
         SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
@@ -199,30 +192,30 @@ void drawGameInfo(App* app) {
         SetMouseCursor(MOUSE_CURSOR_DEFAULT);
     }
 
-    const char* str = TextFormat("%d moves", app->game.player.numMoves);
-    drawText(&app->game.assetManager, str, (Vector2){ app->windowSize.x / 4, 20 }, 50, c);
+    const char* str = TextFormat("%d moves", app->game->player.numMoves);
+    drawText(&app->game->assetManager, str, (Vector2){ app->windowSize.x / 4, 20 }, 50, c);
 
-    const char* str1 = TextFormat("Level %d", app->game.level + 1);
-    drawText(&app->game.assetManager, str1, (Vector2){ app->windowSize.x / 2, 20 }, 50, c);
+    const char* str1 = TextFormat("Level %d", app->game->level + 1);
+    drawText(&app->game->assetManager, str1, (Vector2){ app->windowSize.x / 2, 20 }, 50, c);
 
-    Level* level = &app->game.levels[app->game.level];
+    Level* level = &app->game->levels[app->game->level];
     const char* str2 = TextFormat(
         "%d / %d boxes", countCompletedGoals(level), level->numGoals);
-    drawText(&app->game.assetManager, str2, (Vector2){ app->windowSize.x / 1.25, 20 }, 50, c);
+    drawText(&app->game->assetManager, str2, (Vector2){ app->windowSize.x / 1.25, 20 }, 50, c);
 }
 
 void gameloop(App* app) {
-    Level* level = &app->game.levels[app->game.level];
+    Level* level = &app->game->levels[app->game->level];
 
     if (countCompletedGoals(level) == level->numGoals) { // solved the level
-        changeLevel(&app->game, -1, true);
+        changeLevel(app->game, -1, true);
         startAnimation(&app->fade, (Vector2){1, 1}, true);
         return;
     }
 
-    BeginMode3D(app->game.camera);
-    BeginShaderMode(app->game.assetManager.shader);
-    drawGame(&app->game);
+    BeginMode3D(app->game->camera);
+    BeginShaderMode(app->game->assetManager.shader);
+    drawGame(app->game);
     EndShaderMode();
     EndMode3D();
 
@@ -233,32 +226,32 @@ void gameloop(App* app) {
 void handleInput(App* app) {
     if (WindowShouldClose() ||
         IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_CAPS_LOCK)) {
-        savePlayerData(&app->game);
+        persistData(&app->game->assetManager);
         app->quit = true;
         return;
     }
 
     if (IsKeyPressed(KEY_F))
-        app->fullscreen = !app->fullscreen;
+        app->game->assetManager.data.fullscreen = !app->game->assetManager.data.fullscreen;
 
     if (IsKeyPressed(KEY_M))
-        app->enableBackgroundMusic = !app->enableBackgroundMusic;
+        app->game->assetManager.data.playBgMusic = !app->game->assetManager.data.playBgMusic;
 
     if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_A))
-        movePlayer(&app->game, 1, 0);
+        movePlayer(app->game, 1, 0);
 
     if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_D))
-        movePlayer(&app->game, -1, 0);
+        movePlayer(app->game, -1, 0);
 
     if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W))
-        movePlayer(&app->game, 0, -1);
+        movePlayer(app->game, 0, -1);
 
     if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S))
-        movePlayer(&app->game, 0, 1);
+        movePlayer(app->game, 0, 1);
 
     if (IsKeyPressed(KEY_R)) {
-        restartLevel(&app->game.levels[app->game.level]);
-        changeLevel(&app->game, app->game.level, false);
+        restartLevel(&app->game->levels[app->game->level]);
+        changeLevel(app->game, app->game->level, false);
     }
 
 }
@@ -267,7 +260,9 @@ void updateApp(void* data) {
     App* app = (App*)data;
 
     handleInput(app);
-    updateSound(&app->game.assetManager, BackgroundMusic, app->enableBackgroundMusic);
+    updateSound(
+        &app->game->assetManager, BackgroundMusic,
+        app->game->assetManager.data.playBgMusic);
 
     BeginDrawing();
     ClearBackground((Color){ 163, 208, 229, 255 });
@@ -284,26 +279,22 @@ void updateApp(void* data) {
 
 int main() {
     SetTraceLogLevel(LOG_WARNING);
-    // TODO: set fullscreen mode from the loaded player data from here
-    SetConfigFlags(FLAG_FULLSCREEN_MODE | FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
-    InitWindow(0, 0, "Sokoban");
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
+    InitWindow(900, 700, "Sokoban");
     InitAudioDevice();
 
-    Vector2 windowSize = {
-        GetMonitorWidth(GetCurrentMonitor()),
-        GetMonitorHeight(GetCurrentMonitor())
-    };
-    App app = createApp(windowSize);
+    App* app = createApp();
+    // TODO: set the window size based on whether we should be fullscreen or not
 
 #if defined(PLATFORM_WEB)
-    emscripten_set_main_loop_arg(updateGameWrapper, &app, 60, 1);
+    emscripten_set_main_loop_arg(updateApp, app, 60, 1);
 #else
     SetTargetFPS(60);
-    while (!app.quit)
-        updateApp(&app);
+    while (!app->quit)
+        updateApp(app);
 #endif
 
-    cleanupApp(&app);
+    cleanupApp(app);
     CloseAudioDevice();
     CloseWindow();
 }

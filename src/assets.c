@@ -1,7 +1,19 @@
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
+#include <raylib.h>
 #include "assets.h"
-#include "raylib.h"
+
+void loadSaveData(AssetManager* am) {
+    am->saveFile = "assets/save.dat";
+    FILE *fp = fopen(am->saveFile, "rb");
+    if (fp == NULL) { // reset to defaults if we couldn't read the file
+        memset(&am->data.solvedLevels, 0, sizeof(am->data.solvedLevels));
+        am->data.playBgMusic = true;
+        am->data.fullscreen = true;
+    }
+    fread(&am->data, sizeof(SaveData), 1, fp);
+}
 
 ModelAsset loadModel(AssetManager* am, Texture2D texture, const char *path) {
     ModelAsset asset;
@@ -43,12 +55,14 @@ AssetManager loadAssets() {
     am.sounds[SuccessSfx] = LoadSound("assets/sounds/success.mp3");
     am.sounds[BackgroundMusic] = LoadSound("assets/sounds/sunshine.mp3");
 
+    loadSaveData(&am);
+
     char* paths[] = {
-        "assets/Main/Green/tree2/tree2.vox",
-        "assets/Main/Green/grass1/grass1.vox",
-        "assets/Main/Green/nograss/nograss.vox",
-        "assets/Main/Green/box1/box1.vox",
-        "assets/Animals/Panda/panda.vox"
+        "assets/models/tree/tree2.vox",
+        "assets/models/grass/grass1.vox",
+        "assets/models/nograss/nograss.vox",
+        "assets/models/box/box1.vox",
+        "assets/chicken/chicken.vox"
     };
     for (int i = 0; i < NumModels; i++) {
         am.textures[i] = LoadTexture(TextFormat("%s.png", paths[i]));
@@ -89,6 +103,14 @@ Rectangle drawText(
     position.y -= size.y / 2;
     DrawTextEx(am->font, text, position, fontSize, 0, color);
     return (Rectangle){position.x, position.y, size.x, size.y};
+}
+
+int persistData(AssetManager* am) {
+    FILE *fp = fopen(am->saveFile, "wb");
+    if (fp == NULL) return -1;
+    fwrite(&am->data, sizeof(SaveData), 1, fp);
+    fclose(fp);
+    return 0;
 }
 
 void cleanupAssets(AssetManager* am) {

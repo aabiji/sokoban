@@ -2,13 +2,11 @@
 #define GAME_H
 
 #include "assets.h"
-#include "levels.h"
 
 typedef struct {
     Animation position;
     Animation rotation;
     int numMoves;
-    bool solvedLevels[NUM_LEVELS];
 } Player;
 
 typedef struct {
@@ -17,23 +15,21 @@ typedef struct {
     Shader shader;
 
     Player player;
-    const char* saveFile;
 
     int level;
-    Level levels[NUM_LEVELS];
+    Level* levels;
     Vector3 drawOffset;
     int numBoxMoves;
     int boxMoves[25];
 } Game;
 
-Game createGame();
+Game* createGame();
 void cleanupGame(Game* game);
 void drawGame(Game* game);
 
 void changeLevel(Game* game, int levelIndex, bool advance);
 
 bool levelSolved(Game* game);
-int savePlayerData(Game* game);
 void movePlayer(Game* game, int deltaX, int deltaY);
 
 #endif

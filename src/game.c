@@ -1,32 +1,23 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "game.h"
 #include "assets.h"
 #include "levels.h"
 #include "raylib.h"
 
-Game createGame() {
-    Game game = { .numBoxMoves = 0 };
-
-    // Load the player data
-    game.saveFile = "assets/save.dat";
-    FILE *fp = fopen(game.saveFile, "rb");
-    if (fp == NULL) { // reset to defaults if we couldn't read the file
-        memset(&game.player, 0, sizeof(Player));
-        return game;
-    }
-    fread(&game.player, sizeof(Player), 1, fp);
+Game* createGame() {
+    Game* game = calloc(1, sizeof(Game));
 
     // Load the levels
-    int value = parseLevels("assets/levels.txt", game.levels);
+    game->levels = calloc(NUM_LEVELS, sizeof(Level));
+    int value = parseLevels("assets/levels.txt", game->levels);
     if (value == -1) { // TODO: tell user!
         printf("error loading the levels");
         exit(-1);
     }
 
-    game.assetManager = loadAssets();
+    game->assetManager = loadAssets();
     return game;
 }
 
@@ -36,6 +27,7 @@ void cleanupGame(Game* game) {
         free(game->levels[i].pieces);
         free(game->levels[i].original);
     }
+    free(game->levels);
 }
 
 void orientCamera(Game* game) {
@@ -241,13 +233,4 @@ void movePlayer(Game* game, int deltaX, int deltaY) {
 
     game->player.numMoves++;
     startAnimation(&game->player.position, next, false);
-}
-
-int savePlayerData(Game* game) {
-    FILE *fp = fopen(game->saveFile, "wb");
-    if (fp == NULL)
-        return -1;
-    fwrite(&game->player, sizeof(Player), 1, fp);
-    fclose(fp);
-    return 0;
 }
