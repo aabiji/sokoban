@@ -17,12 +17,12 @@ Game* createGame() {
         exit(-1);
     }
 
-    game->assetManager = loadAssets();
+    game->assets = loadAssets();
     return game;
 }
 
 void cleanupGame(Game* game) {
-    cleanupAssets(&game->assetManager);
+    cleanupAssets(game->assets);
     for (int i = 0; i < NUM_LEVELS; i++) {
         free(game->levels[i].pieces);
         free(game->levels[i].original);
@@ -31,8 +31,8 @@ void cleanupGame(Game* game) {
 }
 
 void orientCamera(Game* game) {
-    float w = game->levels[game->level].width * game->assetManager.tileSize.x;
-    float h = game->levels[game->level].height * game->assetManager.tileSize.y;
+    float w = game->levels[game->level].width * game->assets->tileSize.x;
+    float h = game->levels[game->level].height * game->assets->tileSize.y;
     Vector3 center = {w / 2.0, 0, h / 2.0};
 
     // Camera distance needed to be to be able to fully see the longest side
@@ -53,15 +53,20 @@ void orientCamera(Game* game) {
 
     // to ensure the level is centered on screen
     game->drawOffset = (Vector3){
-        game->assetManager.tileSize.x, 0.0,
-        h > 50 ? -game->assetManager.tileSize.z / 2.0 : 0
+        game->assets->tileSize.x, 0.0,
+        h > 50 ? -game->assets->tileSize.z / 2.0 : 0
     };
+}
+
+bool levelSolved(Game *game) {
+    Level* level = &game->levels[game->level];
+    return countCompletedGoals(level) == level->numGoals;
 }
 
 void changeLevel(Game* game, int levelIndex, bool advance) {
     if (advance) {
         levelIndex = game->level + 1;
-        updateSound(&game->assetManager, SuccessSfx, true);
+        updateSound(game->assets, SuccessSfx, true);
     }
 
     game->level = fmax(0, fmin(levelIndex, NUM_LEVELS - 1));
@@ -69,9 +74,12 @@ void changeLevel(Game* game, int levelIndex, bool advance) {
 
     Level* level = &game->levels[game->level];
     Vector2 pos = { level->playerStartX, level->playerStartY };
-    game->player.numMoves = 0;
-    game->player.position = createAnimation(pos, false, PLAYER_SPEED);
-    game->player.rotation = createAnimation((Vector2){ 0, 0 }, true, PLAYER_SPEED);
+    game->playerPosition = createAnimation(pos, false, PLAYER_SPEED);
+    game->playerRotation = createAnimation((Vector2){ 0, 0 }, true, PLAYER_SPEED);
+
+    // show the solution for each level the player has already solved
+    if (game->assets->data.solvedLevels[game->level])
+        solveLevel(level);
 }
 
 void getFirstAndLastWalls(Level* level, int row, int* first, int* last) {
@@ -128,17 +136,17 @@ void updateBoxAnimations(Game* game) {
 
 void drawGame(Game* game) {
     updateBoxAnimations(game);
-    Level level = game->levels[game->level];
+    Level* level = &game->levels[game->level];
 
     // Draw the level tiles
-    for (int y = 0; y < level.height; y++) {
+    for (int y = 0; y < level->height; y++) {
         int first, last;
-        getFirstAndLastWalls(&level, y, &first, &last);
+        getFirstAndLastWalls(level, y, &first, &last);
 
-        for (int x = 0; x < level.width; x++) {
+        for (int x = 0; x < level->width; x++) {
             if (x < first || x > last) continue; // Not inside the bordering walls
 
-            Piece p = level.pieces[y * level.width + x];
+            Piece p = level->pieces[y * level->width + x];
             ModelType type = getModelType(p);
             Vector2 pos = { x, y };
             Vector2 realPos = p.type == Box ? p.boxSlide.vector.value : pos;
@@ -146,28 +154,28 @@ void drawGame(Game* game) {
             // Draw the floor beneath
             if (p.type != Empty) {
                 ModelType t = p.isGoal ? Goal : Floor;
-                drawModel(&game->assetManager, t, game->drawOffset, pos, 0, false);
+                drawModel(game->assets, t, game->drawOffset, pos, 0, false);
             }
 
             // Wall, Floor, Goal, Crate, Guy, NumAssets,
             Vector3 offset = game->drawOffset;
             if (p.type == Border) offset.y = 1.0;
             else if (p.type != Empty) offset.y = 0.5;
-            drawModel(&game->assetManager, type, offset, realPos, 0, p.type != Empty);
+            drawModel(game->assets, type, offset, realPos, 0, p.type != Empty);
         }
     }
 
     // Draw the player
     drawModel(
-        &game->assetManager,
+        game->assets,
         Guy,
         game->drawOffset,
-        game->player.position.vector.value,
-        game->player.rotation.scalar.value,
+        game->playerPosition.vector.value,
+        game->playerRotation.scalar.value,
         true
     );
-    updateAnimation(&game->player.position, GetFrameTime());
-    updateAnimation(&game->player.rotation, GetFrameTime());
+    updateAnimation(&game->playerPosition, GetFrameTime());
+    updateAnimation(&game->playerRotation, GetFrameTime());
 }
 
 bool pushBoxes(Game* game, Vector2 next, int x, int y) {
@@ -200,37 +208,36 @@ bool pushBoxes(Game* game, Vector2 next, int x, int y) {
         pos.y -= y;
     }
 
-    updateSound(&game->assetManager, MoveSfx, true);
+    updateSound(game->assets, MoveSfx, true);
     return true;
 }
 
 void movePlayer(Game* game, int deltaX, int deltaY) {
     // lock the player until animations are done running
-    if (game->player.rotation.active || game->player.position.active ||
+    if (game->playerRotation.active || game->playerPosition.active ||
         game->numBoxMoves > 0) return;
 
     if (deltaX == 1)
-        startAnimation(&game->player.rotation, (Vector2){90, 0}, false);
+        startAnimation(&game->playerRotation, (Vector2){90, 0}, false);
     if (deltaX == -1)
-        startAnimation(&game->player.rotation, (Vector2){270, 0}, false);
+        startAnimation(&game->playerRotation, (Vector2){270, 0}, false);
     if (deltaY == 1)
-        startAnimation(&game->player.rotation, (Vector2){0, 0}, false);
+        startAnimation(&game->playerRotation, (Vector2){0, 0}, false);
     if (deltaY == -1)
-        startAnimation(&game->player.rotation, (Vector2){180, 0}, false);
+        startAnimation(&game->playerRotation, (Vector2){180, 0}, false);
 
-    Vector2 current = game->player.position.vector.value;
+    Vector2 current = game->playerPosition.vector.value;
     Vector2 next =
         (Vector2){round(current.x + deltaX), round(current.y + deltaY)};
 
-    Level level = game->levels[game->level];
-    int index = next.y * level.width + next.x;
-    if (level.pieces[index].type == Border) return;
+    Level* level = &game->levels[game->level];
+    int index = next.y * level->width + next.x;
+    if (level->pieces[index].type == Border) return;
 
-    if (level.pieces[index].type == Box) {
+    if (level->pieces[index].type == Box) {
         bool canPushBoxes = pushBoxes(game, next, deltaX, deltaY);
         if (!canPushBoxes) return;
     }
 
-    game->player.numMoves++;
-    startAnimation(&game->player.position, next, false);
+    startAnimation(&game->playerPosition, next, false);
 }

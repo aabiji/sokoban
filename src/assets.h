@@ -37,7 +37,7 @@ typedef struct {
     const char* saveFile;
 } AssetManager;
 
-AssetManager loadAssets();
+AssetManager* loadAssets();
 void cleanupAssets(AssetManager* am);
 
 void drawModel(
@@ -45,10 +45,14 @@ void drawModel(
     Vector2 position, float rotation, bool offsetHeight);
 Rectangle drawText(
     AssetManager* am, const char* text, Vector2 position,
-    int fontSize, Color color); // draw text and return its (x,y,width,height)
+    int fontSize, Color color, bool center); // draw text and return its (x,y,width,height)
 
 void updateSound(AssetManager* am, Sounds sound, bool play);
 
 int persistData(AssetManager* am);
+void togglefullscreen(AssetManager* am);
+void togglePlayBgMusic(AssetManager* am);
+bool alreadySolved(AssetManager* am, int level);
+void markSolved(AssetManager* am, int level);
 
 #endif

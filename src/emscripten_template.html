@@ -22,7 +22,19 @@
 
       #progress {
         background-color: darkblue;
-        width: 1;
+        width: 1px;
+        height: 100%;
+        border-radius: 8px;
+        transition: width 0.3s ease;
+      }
+ 
+      #progress-container {
+        width: 200px;
+        height: 8px;
+        border-radius: 8px;
+        background-color: lightgrey;
+        border: 1px dashed lightgrey;
+        overflow: hidden;
       }
 
       #canvas, #error-screen, #loading-screen {
@@ -33,21 +45,23 @@
         width: 100%;
         height: 100%;
       }
- 
-      #progress-container {
-        width: 200px;
-        height: 8px;
-        border-radius: 8px;
-        background-color: lightgrey;
-        border: 1px dashed lightgrey;
+
+      // TODO: style this!
+      #play-button {
+         
+      }
+
+      #play-button:disabled {
+         
       }
     </style>
   </head>
 
   <body>
     <div id="loading-screen">
-      <h1> Loading </h1>
+      <h1 id="loading-message"></h1>
       <div id="progress-container"> <div id="progress"></div> </div>
+      <button id="play-button" disabled>Play</button>
     </div>
 
     <div id="error-screen">
@@ -60,20 +74,28 @@
       oncontextmenu="event.preventDefault()"></canvas>
 
     <script type="text/javascript">
-      const progressContainer = document.getElementById("progress-container");
-      const progress = document.getElementById("progress");
-      const loadingScreen = document.getElementById("loading-screen");
-      const errorScreen = document.getElementById("error-screen");
-      const errorMsg = document.getElementById("error-msg");
-      const canvas = document.getElementById("canvas");
+      let progressContainer = document.getElementById("progress-container");
+      let progress = document.getElementById("progress");
+
+      let loadingScreen = document.getElementById("loading-screen");
+      let playButton = document.getElementById("play-button");
+      const loadingMsg = document.getElementById("loading-message");
+
+      let errorScreen = document.getElementById("error-screen");
+      let errorMsg = document.getElementById("error-msg");
+
+      let canvas = document.getElementById("canvas");
 
       loadingScreen.style.display = "flex"; // first "screen" that'll show
-
-      const setStatus = (text) => {
-        // show the canvas when ready
-        if (text.includes("Running")) {
+      playButton.onclick = (event) => { // show the canvas
           loadingScreen.style.display = "none";
           canvas.style.display = "flex";
+      };
+
+      const setStatus = (text) => {
+        if (text.includes("Running")) {
+          loadingMsg.innerText = "Game loaded";
+          playButton.disabled = false;
           return;
         }
 
@@ -87,10 +109,11 @@
         }
 
         // set the progress bar
-        const nums = text.match(/\d+/);
+        const nums = text.match(/(\d+(\.\d+)?)/g);
         if (nums && nums.length == 2) {
           const percentage = (parseInt(nums[0]) / parseInt(nums[1]));
           progress.style.width = `${percentage * progressContainer.offsetWidth}px`;
+          loadingMsg.innerText = "Loading...";
         }
       }
 

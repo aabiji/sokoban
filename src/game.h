@@ -4,17 +4,12 @@
 #include "assets.h"
 
 typedef struct {
-    Animation position;
-    Animation rotation;
-    int numMoves;
-} Player;
-
-typedef struct {
-    AssetManager assetManager;
     Camera3D camera;
     Shader shader;
+    AssetManager* assets;
 
-    Player player;
+    Animation playerPosition;
+    Animation playerRotation;
 
     int level;
     Level* levels;
@@ -28,8 +23,8 @@ void cleanupGame(Game* game);
 void drawGame(Game* game);
 
 void changeLevel(Game* game, int levelIndex, bool advance);
-
 bool levelSolved(Game* game);
+
 void movePlayer(Game* game, int deltaX, int deltaY);
 
 #endif

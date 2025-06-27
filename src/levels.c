@@ -60,7 +60,7 @@ int parseLevels(char* filePath, Level* levels) {
     int i = 0;
     int width = 0;
     int height = 0;
-    Line lines[MAX_LINES];
+    Line lines[40];
 
     while ((length = getline(&line, &bufferSize, file)) != -1) {
         if (length == 1 && line[0] == '\n') { // puzzles are separated by a new line
@@ -103,4 +103,26 @@ int countCompletedGoals(Level* level) {
             completed++;
     }
     return completed;
+}
+
+void solveLevel(Level* level) {
+    int nextGoal = 0;
+    for (int y = 0; y < level->height; y++) {
+        for (int x = 0; x < level->width; x++) {
+            int index = y * level->width + x;
+            Piece p = level->pieces[index];
+
+            // Move box into the next available goal position
+            if (!p.isGoal && p.type == Box) {
+                int goalIndex = level->goalIndexes[nextGoal++];
+                int goalX = goalIndex % level->width;
+                int goalY = (goalIndex - goalX) / level->width;
+
+                level->pieces[goalIndex].type = Box;
+                level->pieces[goalIndex].boxSlide =
+                    createAnimation((Vector2){ goalX, goalY }, false, PLAYER_SPEED);
+                level->pieces[index].type = Empty;
+            }
+        }
+    }
 }

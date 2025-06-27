@@ -45,11 +45,12 @@ if ("${PLATFORM}" STREQUAL "Web")
     target_link_options(
         ${PROJECT_NAME} PUBLIC
         -sUSE_GLFW=3
+        -sASYNCIFY
         --preload-file assets
         -sEXPORTED_RUNTIME_METHODS=['HEAPF32','HEAP32','HEAPU8']
         -sALLOW_MEMORY_GROWTH=1
         -sINITIAL_MEMORY=64MB
-        -sSTACK_SIZE=4194304
+        -sSTACK_SIZE=10485760 # same as linux, 10 mb
         "--shell-file=${CMAKE_SOURCE_DIR}/src/emscripten_template.html"
     )
 endif()

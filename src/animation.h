@@ -6,7 +6,7 @@
 
 // all in seconds
 #define PLAYER_SPEED 0.1
-#define TRANSISTION_SPEED 0.5
+#define TRANSISTION_SPEED 0.25
 
 typedef struct {
     float t;

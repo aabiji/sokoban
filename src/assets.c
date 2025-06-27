@@ -1,16 +1,24 @@
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <raylib.h>
 #include "assets.h"
 
+#if defined(PLATFORM_WEB)
+    #define GLSL_VERSION 100
+#else
+    #define GLSL_VERSION 330
+#endif
+
 void loadSaveData(AssetManager* am) {
     am->saveFile = "assets/save.dat";
-    FILE *fp = fopen(am->saveFile, "rb");
+    FILE* fp = fopen(am->saveFile, "rb");
     if (fp == NULL) { // reset to defaults if we couldn't read the file
-        memset(&am->data.solvedLevels, 0, sizeof(am->data.solvedLevels));
+        memset(&am->data.solvedLevels, false, sizeof(am->data.solvedLevels));
         am->data.playBgMusic = true;
         am->data.fullscreen = true;
+        return;
     }
     fread(&am->data, sizeof(SaveData), 1, fp);
 }
@@ -43,31 +51,33 @@ ModelAsset loadModel(AssetManager* am, Texture2D texture, const char *path) {
     return asset;
 }
 
-AssetManager loadAssets() {
-    AssetManager am = {
-        .tileSize = (Vector3){2.5, 2.5, 2.5},
-        .font = LoadFont("assets/fonts/SuperPlayful.ttf"),
-        .shader = LoadShader("assets/shaders/vertex.glsl", "assets/shaders/fragment.glsl")
-    };
+AssetManager* loadAssets() {
+    AssetManager* am = calloc(1, sizeof(AssetManager));
+    am->tileSize = (Vector3){2.5, 2.5, 2.5};
+    am->font = LoadFont("assets/fonts/SuperPlayful.ttf");
 
-    am.sounds[MoveSfx] = LoadSound("assets/sounds/step.wav");
-    am.sounds[PushSfx] = LoadSound("assets/sounds/pop.mp3");
-    am.sounds[SuccessSfx] = LoadSound("assets/sounds/success.mp3");
-    am.sounds[BackgroundMusic] = LoadSound("assets/sounds/sunshine.mp3");
+    const char* vertexName = TextFormat("assets/shaders/vertex-%d.glsl", GLSL_VERSION);
+    const char* fragName = TextFormat("assets/shaders/fragment-%d.glsl", GLSL_VERSION);
+    am->shader = LoadShader(vertexName, fragName);
 
-    loadSaveData(&am);
+    am->sounds[MoveSfx] = LoadSound("assets/sounds/step.wav");
+    am->sounds[PushSfx] = LoadSound("assets/sounds/pop.mp3");
+    am->sounds[SuccessSfx] = LoadSound("assets/sounds/success.mp3");
+    am->sounds[BackgroundMusic] = LoadSound("assets/sounds/sunshine.mp3");
+
+    loadSaveData(am);
 
     char* paths[] = {
         "assets/models/tree/tree2.vox",
         "assets/models/grass/grass1.vox",
         "assets/models/nograss/nograss.vox",
         "assets/models/box/box1.vox",
-        "assets/chicken/chicken.vox"
+        "assets/models/chicken/chicken.vox"
     };
     for (int i = 0; i < NumModels; i++) {
-        am.textures[i] = LoadTexture(TextFormat("%s.png", paths[i]));
+        am->textures[i] = LoadTexture(TextFormat("%s.png", paths[i]));
         const char* path = TextFormat("%s.obj", paths[i]);
-        am.assets[i] = loadModel(&am, am.textures[i], path);
+        am->assets[i] = loadModel(am, am->textures[i], path);
     }
 
     return am;
@@ -96,22 +106,28 @@ void updateSound(AssetManager* am, Sounds sound, bool play) {
 
 Rectangle drawText(
     AssetManager* am, const char* text, Vector2 position,
-    int fontSize, Color color) {
-    // center the text at the target position
+    int fontSize, Color color, bool center) {
     Vector2 size = MeasureTextEx(am->font, text, fontSize, 0);
-    position.x -= size.x / 2;
-    position.y -= size.y / 2;
+    if (center) {
+        position.x -= size.x / 2;
+        position.y -= size.y / 2;
+    }
     DrawTextEx(am->font, text, position, fontSize, 0, color);
     return (Rectangle){position.x, position.y, size.x, size.y};
 }
 
 int persistData(AssetManager* am) {
-    FILE *fp = fopen(am->saveFile, "wb");
+    FILE* fp = fopen(am->saveFile, "wb");
     if (fp == NULL) return -1;
     fwrite(&am->data, sizeof(SaveData), 1, fp);
     fclose(fp);
     return 0;
 }
+
+void togglefullscreen(AssetManager* am) { am->data.fullscreen = !am->data.fullscreen; }
+void togglePlayBgMusic(AssetManager* am) { am->data.playBgMusic = !am->data.playBgMusic; }
+bool alreadySolved(AssetManager* am, int level) { return am->data.solvedLevels[level]; }
+void markSolved(AssetManager* am, int level) { am->data.solvedLevels[level] = true; }
 
 void cleanupAssets(AssetManager* am) {
     UnloadFont(am->font);
@@ -123,4 +139,6 @@ void cleanupAssets(AssetManager* am) {
         StopSound(am->sounds[i]);
         UnloadSound(am->sounds[i]);
     }
+    UnloadShader(am->shader);
+    free(am);
 }

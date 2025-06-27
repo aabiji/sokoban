@@ -4,8 +4,6 @@
 #include "animation.h"
 
 #define NUM_LEVELS 50
-#define MAX_LINES 40
-#define MAX_GOAL_INDEXES 100
 
 typedef struct {
     enum { Empty, Border, Box } type;
@@ -19,13 +17,15 @@ typedef struct {
     int playerStartX;
     int playerStartY;
     int numGoals;
-    int goalIndexes[MAX_GOAL_INDEXES];
+    int goalIndexes[100];
     Piece* pieces;
     Piece* original;
 } Level;
 
 int parseLevels(char* filePath, Level* levels);
 void restartLevel(Level* level);
+
 int countCompletedGoals(Level* level);
+void solveLevel(Level* level);
 
 #endif
