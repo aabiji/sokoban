@@ -1,4 +1,0 @@
-IndentWidth: 4
-IndentPPDirectives: BeforeHash
-AccessModifierOffset: -2
-BasedOnStyle: LLVM
