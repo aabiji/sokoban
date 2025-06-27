@@ -1,21 +1,21 @@
 <!DOCTYPE html>
 <html lang="en-us">
   <head>
-    <title>Sokoban</title>
+    <title>Chickoban</title>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <style>
       @font-face {
-        font-family: "SuperPlayful";
-        src: url("assets/fonts/SuperPlayful.ttf");
+        font-family: "puffy";
+        src: url("assets/puffy.otf") format("otf");
       }
 
       html, body {
         width: 100%;
         height: 100%;
         margin: 0;
-        font-family: "SuperPlayful";
-        background-color: rgba(163, 208, 229, 1);
+        font-family: "puffy";
+        background-color: rgba(160, 210, 235, 1);
       }
 
       h1, h3 { text-align: center; }
@@ -46,13 +46,28 @@
         height: 100%;
       }
 
-      // TODO: style this!
       #play-button {
-         
+        width: 200px;
+        color: white;
+        border: none;
+        outline: none;
+        background-color: #f25c54;
+        padding: 16px 60px;
+        border-radius: 40px;
+        font-size: 1.5rem;
+        font-family: "puffy";
+        cursor: pointer;
+        margin-top: 25px;
+      }
+
+      #play-button:hover:not(:disabled) {
+        background-color: #e5534b;
       }
 
       #play-button:disabled {
-         
+        background-color: #f6928d;
+        border-color: #f6928d;
+        cursor: not-allowed;
       }
     </style>
   </head>

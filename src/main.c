@@ -7,7 +7,7 @@
 int main() {
     SetTraceLogLevel(LOG_WARNING);
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
-    InitWindow(900, 700, "Sokoban");
+    InitWindow(900, 700, "Chickoban");
     InitAudioDevice();
 
     App* app = createApp();

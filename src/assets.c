@@ -13,14 +13,14 @@
 
 void loadSaveData(AssetManager* am) {
     am->saveFile = "assets/save.dat";
+    int result = -1;
     FILE* fp = fopen(am->saveFile, "rb");
-    if (fp == NULL) { // reset to defaults if we couldn't read the file
+    if (fp != NULL) result = fread(&am->data, sizeof(SaveData), 1, fp);
+    if (fp == NULL || result != 0) {  // reset to defaults if we couldn't read the file
         memset(&am->data.solvedLevels, false, sizeof(am->data.solvedLevels));
         am->data.playBgMusic = true;
         am->data.fullscreen = true;
-        return;
     }
-    fread(&am->data, sizeof(SaveData), 1, fp);
 }
 
 ModelAsset loadModel(AssetManager* am, Texture2D texture, const char *path) {
@@ -54,7 +54,7 @@ ModelAsset loadModel(AssetManager* am, Texture2D texture, const char *path) {
 AssetManager* loadAssets() {
     AssetManager* am = calloc(1, sizeof(AssetManager));
     am->tileSize = (Vector3){2.5, 2.5, 2.5};
-    am->font = LoadFont("assets/fonts/SuperPlayful.ttf");
+    am->font = LoadFont("assets/puffy.otf");
 
     const char* vertexName = TextFormat("assets/shaders/vertex-%d.glsl", GLSL_VERSION);
     const char* fragName = TextFormat("assets/shaders/fragment-%d.glsl", GLSL_VERSION);

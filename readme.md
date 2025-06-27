@@ -1,17 +1,20 @@
-A simple puzzle game inspired by Sokoban
+A simple puzzle game inspired by Sokoban.
+
+![Screenshot](screenshot.png)
 
 Build and run:
 ```bash
 # For web
-emcmake cmake -B build -DPLATFORM=Web -DCMAKE_BUILD_TYPE=Debug
-cd build && make && cd sokoban
+# Install emscripten: https://emscripten.org/docs/getting_started/downloads.html
+emcmake cmake -B build-web -DPLATFORM=Web -DCMAKE_BUILD_TYPE=Release
+cd build-web && make && cd chickoban
 sudo npm install -g live-server
-live-server --entry-file=sokoban.html
+live-server --entry-file=chickoban.html
 
 # For desktop
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
-cd build && make && cd sokoban
-./sokoban
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cd build && make && cd chickoban
+./chickoban
 ```
 
 Credits:
@@ -22,4 +25,4 @@ Credits:
 - Sound effects from [here](https://opengameart.org/content/12-player-movement-sfx)
   and [here](https://pixabay.com/sound-effects/search/pop/)
 
-Just for fun :)
+I made this just for fun, hope you enjoy :)

@@ -66,7 +66,7 @@ Color brightenColor(Color c, float amount) {
 
 void drawLevelSelect(App* app) {
     Color pop = { 242, 92, 84, 255 };
-    drawText(app->game->assets, "Sokoban",
+    drawText(app->game->assets, "Chickoban",
             (Vector2){ app->windowSize.x / 2, app->windowSize.y / 3.5 },
             65, pop, true);
 
@@ -104,7 +104,7 @@ void drawLevelSelect(App* app) {
 
             const char* str = TextFormat("%d", level + 1);
             Vector2 p = {r.x + boxSize / 2, r.y + boxSize / 2};
-            drawText(app->game->assets, str, p, 40, WHITE, true);
+            drawText(app->game->assets, str, p, 25, WHITE, true);
 
             pos.x += boxSize * 1.5;
         }
@@ -113,7 +113,7 @@ void drawLevelSelect(App* app) {
     }
 
     Vector2 bottom = { app->windowSize.x / 2, app->windowSize.y - 50 };
-    drawText(app->game->assets, "(C) 2025- @aabiji", bottom, 35, pop, true);
+    drawText(app->game->assets, "(C) 2025- @aabiji", bottom, 20, pop, true);
     drawFadeAnimation(app);
 
     if (hovering)
@@ -127,7 +127,7 @@ void drawGameInfo(App* app) {
 
     // go back button
     Rectangle box =
-        drawText(app->game->assets, "<< Back", (Vector2){15, 15}, 50, c, false);
+        drawText(app->game->assets, "<< Back", (Vector2){15, 15}, 30, c, false);
     if (mouseInside(box)) {
         SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
@@ -144,8 +144,8 @@ void drawGameInfo(App* app) {
         TextFormat("%d / %d boxes", countCompletedGoals(level), level->numGoals),
     };
     for (int i = 0; i < 2; i++) {
-        Vector2 p = { 10, (app->windowSize.y / 2 - 40) + i * 50 };
-        drawText(app->game->assets, info[i], p, 40, c, false);
+        Vector2 p = { 10, (app->windowSize.y / 2 - 40) + i * 30 };
+        drawText(app->game->assets, info[i], p, 25, c, false);
     }
 
     const char* instructions[5] = {
@@ -156,8 +156,8 @@ void drawGameInfo(App* app) {
         "Press r to toggle restart"
     };
     for (int i = 0; i < 5; i++) {
-        Vector2 p = { 10, app->windowSize.y - i * 40 };
-        drawText(app->game->assets, instructions[i], p, 30, c, false);
+        Vector2 p = { 10, app->windowSize.y - i * 30 };
+        drawText(app->game->assets, instructions[i], p, 20, c, false);
     }
 }
 
