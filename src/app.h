@@ -14,5 +14,6 @@ typedef struct {
 App* createApp();
 void cleanupApp(App* app);
 void updateApp(void* data);
+void handleMouseMove(App* app);
 
 #endif

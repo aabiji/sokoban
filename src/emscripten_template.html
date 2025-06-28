@@ -37,13 +37,20 @@
         overflow: hidden;
       }
 
-      #canvas, #error-screen, #loading-screen {
+      #error-screen, #loading-screen {
         display: none;
         justify-content: center;
         flex-direction: column;
         align-items: center;
         width: 100%;
         height: 100%;
+      }
+
+      #canvas {
+        display: none;
+        margin: auto;
+        position: absolute;
+        top: 0; left: 0; bottom: 0; right: 0;
       }
 
       #play-button {
@@ -99,12 +106,24 @@
       let errorScreen = document.getElementById("error-screen");
       let errorMsg = document.getElementById("error-msg");
 
-      let canvas = document.getElementById("canvas");
+      let canvas = document.getElementById("canvas"); 
 
       loadingScreen.style.display = "flex"; // first "screen" that'll show
       playButton.onclick = (event) => { // show the canvas
           loadingScreen.style.display = "none";
-          canvas.style.display = "flex";
+          canvas.style.display = "block";
+          resizeCanvas();
+      };
+
+      const resizeCanvas = () => {
+          const dpr = window.devicePixelRatio || 1;
+          const width = window.innerWidth;
+          const height = window.innerHeight;
+          canvas.width = width * dpr;
+          canvas.height = height * dpr;
+          canvas.style.width = `${width}px`;
+          canvas.style.height = `${height}px`;
+          Module._resize(width, height);
       };
 
       const setStatus = (text) => {
@@ -138,6 +157,8 @@
         Module.setStatus("error: WebGL context was lost");
         event.preventDefault();
       });
+
+      window.onresize = () => resizeCanvas();
 
       window.onerror = (event) => Module.setStatus("error: Something went wrong :(");
     </script>
