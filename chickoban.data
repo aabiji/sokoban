@@ -740,7 +740,7 @@ map_Kd box1.vox.png
 # MagicaVoxel @ Ephtracy
 
 # group
-o 
+o box1
 
 # material
 mtllib box1.vox.mtl
@@ -1645,7 +1645,7 @@ map_Kd chicken.vox.png
 # MagicaVoxel @ Ephtracy
 
 # group
-o 
+o chicken
 
 # material
 mtllib chicken.vox.mtl
@@ -2066,7 +2066,7 @@ map_Kd grass1.vox.png
 # MagicaVoxel @ Ephtracy
 
 # group
-o 
+o grass1
 
 # material
 mtllib grass1.vox.mtl
@@ -2161,7 +2161,7 @@ map_Kd nograss.vox.png
 # MagicaVoxel @ Ephtracy
 
 # group
-o 
+o nograss
 
 # material
 mtllib nograss.vox.mtl
@@ -2239,7 +2239,7 @@ map_Kd tree2.vox.png
 # MagicaVoxel @ Ephtracy
 
 # group
-o 
+o group
 
 # material
 mtllib tree2.vox.mtl
