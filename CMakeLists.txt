@@ -50,9 +50,14 @@ if ("${PLATFORM}" STREQUAL "Web")
         -sEXPORTED_RUNTIME_METHODS=['HEAPF32','HEAP32','HEAPU8']
         -sALLOW_MEMORY_GROWTH=1
         -sINITIAL_MEMORY=64MB
+        -O3
         -sSTACK_SIZE=10485760 # same as linux, 10 mb
         "--shell-file=${CMAKE_SOURCE_DIR}/src/emscripten_template.html"
     )
+endif()
+
+if ("${PLATFORM}" STREQUAL "Desktop")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -fsanitize=address,undefined")
 endif()
 
 # Checks if OSX and links appropriate frameworks (Only required on MacOS)

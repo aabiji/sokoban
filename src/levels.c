@@ -1,4 +1,5 @@
 #include <raymath.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -39,7 +40,7 @@ Level parseLevel(Line* lines, int width, int height) {
             if (p.isGoal)
                 level.goalIndexes[level.numGoals++] = index;
 
-            if (lines[y].str[x] == '@') {
+            if (x < lines[y].length && lines[y].str[x] == '@') {
                 level.playerStartX = x;
                 level.playerStartY = y;
             }
@@ -53,16 +54,16 @@ int parseLevels(char* filePath, Level* levels) {
     FILE* file = fopen(filePath, "r");
     if (file == NULL) return -1;
 
-    char* line = NULL;
-    size_t bufferSize = 0;
-    size_t length = 0;
-
-    int i = 0;
     int width = 0;
     int height = 0;
     Line lines[40];
 
-    while ((length = getline(&line, &bufferSize, file)) != -1) {
+    int i = 0;
+    char line[100];
+
+    while (fgets(line, sizeof(line), file)) {
+        size_t length = strlen(line);
+
         if (length == 1 && line[0] == '\n') { // puzzles are separated by a new line
             levels[i++] = parseLevel(lines, width, height);
 
@@ -72,7 +73,7 @@ int parseLevels(char* filePath, Level* levels) {
             }
             width = height = 0;
         } else {
-            width = fmax(width, length); // Lines can be of different lengths
+            width = length > width ? length : width; // lines can be of different lengths
             lines[height++] = (Line){ length, strdup(line) };
         }
     }
@@ -83,7 +84,6 @@ int parseLevels(char* filePath, Level* levels) {
         free(lines[y].str);
     }
 
-    free(line);
     fclose(file);
     return i != NUM_LEVELS ? -1 : 0;
 }

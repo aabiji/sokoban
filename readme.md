@@ -1,4 +1,5 @@
 A simple puzzle game inspired by Sokoban.
+You can play it online [here](https://aabiji.github.io/chickoban/)
 
 ![Screenshot](screenshot.png)
 
