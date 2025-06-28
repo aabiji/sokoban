@@ -156,7 +156,7 @@ void drawGameInfo(App* app) {
         "Press r to toggle restart"
     };
     for (int i = 0; i < 5; i++) {
-        Vector2 p = { 10, app->windowSize.y - i * 30 };
+        Vector2 p = { 10, app->windowSize.y - (i + 1) * 30 };
         drawText(app->game->assets, instructions[i], p, 20, c, false);
     }
 }
