@@ -4,6 +4,8 @@
 #include "assets.h"
 #include "game.h"
 
+// TODO: how can we make the level selection and the game info more mobile friendly?
+
 App* createApp() {
     App* app = calloc(1, sizeof(App));
     app->quit = false;

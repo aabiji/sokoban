@@ -4,6 +4,7 @@
 #endif
 
 #include <stddef.h>
+#include <string.h>
 #include "app.h"
 
 App* app = NULL;
