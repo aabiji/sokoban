@@ -176,7 +176,7 @@
         if (navigator.storage && navigator.storage.persist)
           navigator.storage.persist().then(granted => {
             if (!granted)
-              Module.setStatus("error: Please allow persistent storage for this site");
+              console.log("error: Please allow persistent storage for this site");
           });
 
         // setup IndexedDB on startup for persistent file storage
