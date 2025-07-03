@@ -9,9 +9,18 @@
 App* app = NULL;
 
 #if defined(PLATFORM_WEB)
-EMSCRIPTEN_KEEPALIVE void resize(int width, int height) {
+EMSCRIPTEN_KEEPALIVE
+void resize(int width, int height) {
     SetWindowSize(width, height);
     app->windowSize = (Vector2){ width, height };
+}
+
+EMSCRIPTEN_KEEPALIVE
+void handleSwipe(const char* direction) {
+    if (strcmp(direction, "left") == 0) move(app, -1, 0);
+    if (strcmp(direction, "right") == 0) move(app, 1, 0);
+    if (strcmp(direction, "up") == 0) move(app, 0, -1);
+    if (strcmp(direction, "down") == 0) move(app, 0, 1);
 }
 #endif
 

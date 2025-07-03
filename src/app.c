@@ -180,6 +180,10 @@ void gameloop(App* app) {
     drawFadeAnimation(app);
 }
 
+void move(App* app, int directionX, int directionY) {
+    movePlayer(app->game, directionX, directionY); 
+}
+
 void handleInput(App* app) {
     if (WindowShouldClose() ||
         IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_CAPS_LOCK)) {
@@ -190,10 +194,10 @@ void handleInput(App* app) {
 
     if (IsKeyPressed(KEY_F)) togglefullscreen(app->game->assets);
     if (IsKeyPressed(KEY_M)) togglePlayBgMusic(app->game->assets);
-    if (IsKeyPressed(KEY_RIGHT)) movePlayer(app->game, 1, 0);
-    if (IsKeyPressed(KEY_LEFT)) movePlayer(app->game, -1, 0);
-    if (IsKeyPressed(KEY_UP)) movePlayer(app->game, 0, -1);
-    if (IsKeyPressed(KEY_DOWN)) movePlayer(app->game, 0, 1);
+    if (IsKeyPressed(KEY_RIGHT)) move(app, 1, 0);
+    if (IsKeyPressed(KEY_LEFT)) move(app, -1, 0);
+    if (IsKeyPressed(KEY_UP)) move(app, 0, -1);
+    if (IsKeyPressed(KEY_DOWN)) move(app, 0, 1);
 
     if (IsKeyPressed(KEY_R)) {
         restartLevel(&app->game->levels[app->game->level]);

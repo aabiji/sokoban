@@ -161,6 +161,29 @@
       window.onresize = () => resizeCanvas();
 
       window.onerror = (event) => Module.setStatus("error: Something went wrong :(");
+
+      // handle swiping
+      let startX = 0;
+      let startY = 0;
+
+      document.ontouchstart = (event) => {
+        startX = event.touches[0].clientX;
+        startY = event.touches[0].clientY;
+      };
+
+      document.ontouchend = (event) => {
+        const deltaX = touch.clientX - startX;
+        const deltaY = touch.clientY - startY;
+        const threshold = 30;
+
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+          if (deltaX > threshold) Module._handleSwipe("right");
+          if (deltaX < -threshold) Module._handleSwipe("left");
+        } else {
+          if (deltaY > threshold) Module._handleSwipe("down");
+          if (deltaY < -threshold) Module._handleSwipe("up");
+        }
+      };
     </script>
     {{{ SCRIPT }}}
   </body>
