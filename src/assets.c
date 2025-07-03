@@ -12,7 +12,12 @@
 #endif
 
 void loadSaveData(AssetManager* am) {
+#if defined(PLATFORM_WEB)
+    am->saveFile = "/game-data/save.dat";
+#else
     am->saveFile = "assets/save.dat";
+#endif
+
     int result = -1;
     FILE* fp = fopen(am->saveFile, "rb");
     if (fp != NULL) result = fread(&am->data, sizeof(SaveData), 1, fp);

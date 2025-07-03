@@ -44,12 +44,16 @@
         align-items: center;
         width: 100%;
         height: 100%;
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
       }
 
       #canvas {
         display: none;
         margin: auto;
         position: absolute;
+        width: 100%;
+        height: 100%;
         top: 0; left: 0; bottom: 0; right: 0;
       }
 
@@ -108,10 +112,24 @@
 
       let canvas = document.getElementById("canvas"); 
 
-      loadingScreen.style.display = "flex"; // first "screen" that'll show
-      playButton.onclick = (event) => { // show the canvas
-          loadingScreen.style.display = "none";
-          canvas.style.display = "block";
+      function showScreen(element) {
+        // hide everything
+        loadingScreen.style.display = "none";
+        errorScreen.style.display = "none";
+        canvas.style.display = "none";
+
+        element.style.display = element === canvas ? "block" : "flex";
+
+        // set z-index 
+        canvas.style.zIndex = "0";
+        loadingScreen.style.zIndex = "10";
+        errorScreen.style.zIndex = "20";
+      }
+
+      showScreen(loadingScreen);
+
+      playButton.onclick = (event) => {
+          showScreen(canvas);
           resizeCanvas();
       };
 
@@ -137,8 +155,7 @@
         const parts = text.split("error: ");
         if (parts && parts.length == 2) {
           errorMsg.innerText = parts[1];
-          errorScreen.style.display = "flex";
-          canvas.style.display = "none";
+          showScreen(errorScreen);
           return;
         }
 
@@ -151,27 +168,38 @@
         }
       }
 
-      var Module = { canvas, setStatus };
+      var Module = { canvas, setStatus, preRun: [] };
 
-      canvas.addEventListener("webglcontextlost", (event) => {
-        Module.setStatus("error: WebGL context was lost");
-        event.preventDefault();
+      // run on startup
+      Module.preRun.push(() => {
+        // ask for  persisted storage permissions
+        if (navigator.storage && navigator.storage.persist)
+          navigator.storage.persist().then(granted => {
+            if (!granted)
+              Module.setStatus("error: Please allow persistent storage for this site");
+          });
+
+        // setup IndexedDB on startup for persistent file storage
+        FS.mkdir("/game-data");
+        FS.mount(IDBFS, {}, "/game-data");
+        FS.syncfs(true, (error) => {
+          if (error)
+            Module.setStatus("error: Couldn't sync your game data :(");
+        });
       });
-
-      window.onresize = () => resizeCanvas();
-
-      window.onerror = (event) => Module.setStatus("error: Something went wrong :(");
 
       // handle swiping
       let startX = 0;
       let startY = 0;
 
       document.ontouchstart = (event) => {
-        startX = event.touches[0].clientX;
-        startY = event.touches[0].clientY;
+        const touch = event.touches[0];
+        startX = touch.clientX;
+        startY = touch.clientY;
       };
 
       document.ontouchend = (event) => {
+        const touch = event.changedTouches[0];
         const deltaX = touch.clientX - startX;
         const deltaY = touch.clientY - startY;
         const threshold = 30;
@@ -183,6 +211,22 @@
           if (deltaY > threshold) Module._handleSwipe("down");
           if (deltaY < -threshold) Module._handleSwipe("up");
         }
+      };
+
+      canvas.addEventListener("webglcontextlost", (event) => {
+        Module.setStatus("error: WebGL context was lost");
+        event.preventDefault();
+      });
+
+      window.onresize = () => resizeCanvas();
+
+      window.onerror = (event) => Module.setStatus("error: Something went wrong :(");
+
+      window.beforeunload = () => { // save game data on tab close
+        FS.syncfs(false, (error) => {
+          if (error)
+            Module.setStatus("error: Couldn't sync your game data :(");
+        });
       };
     </script>
     {{{ SCRIPT }}}
