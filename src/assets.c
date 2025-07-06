@@ -46,12 +46,16 @@ ModelAsset loadModel(AssetManager* am, Texture2D texture, const char *path) {
         bounds.max.z - bounds.min.z
     };
 
+    bool isBox = strcmp(path, "assets/models/box/box1.vox.obj") == 0;
+    printf("%d\n", isBox);
+    Vector3 targetSize = isBox ? am->boxSize : am->tileSize;
+
     // scale with correct aspect ratio
     float biggestSide = fmax(fmax(asset.size.x, asset.size.y), asset.size.z);
     asset.scaleFactor = (Vector3){
-        am->tileSize.x / biggestSide,
-        am->tileSize.y / biggestSide,
-        am->tileSize.z / biggestSide
+        targetSize.x / biggestSide,
+        targetSize.y / biggestSide,
+        targetSize.z / biggestSide
     };
     return asset;
 }
@@ -59,6 +63,7 @@ ModelAsset loadModel(AssetManager* am, Texture2D texture, const char *path) {
 AssetManager* loadAssets() {
     AssetManager* am = calloc(1, sizeof(AssetManager));
     am->tileSize = (Vector3){2.5, 2.5, 2.5};
+    am->boxSize = (Vector3){2.0, 2.0, 2.0};
     am->font = LoadFont("assets/puffy.otf");
 
     const char* vertexName = TextFormat("assets/shaders/vertex-%d.glsl", GLSL_VERSION);

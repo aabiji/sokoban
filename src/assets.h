@@ -30,6 +30,7 @@ typedef struct {
     Sound sounds[NumSounds];
 
     Vector3 tileSize;
+    Vector3 boxSize;
     ModelAsset assets[NumModels];
     Texture textures[NumModels];
 
